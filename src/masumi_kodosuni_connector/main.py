@@ -17,6 +17,14 @@ polling_service = PollingService()
 async def lifespan(app):
     logger.info("Starting Masumi Kodosuni Connector")
     
+    # Initialize database
+    try:
+        from masumi_kodosuni_connector.database.connection import init_db
+        await init_db()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error("Failed to initialize database", error=str(e))
+    
     polling_task = asyncio.create_task(polling_service.start())
     
     try:

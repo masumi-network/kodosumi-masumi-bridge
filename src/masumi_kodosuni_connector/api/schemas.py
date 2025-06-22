@@ -1,30 +1,48 @@
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from pydantic import BaseModel
-from masumi_kodosuni_connector.models.agent_run import AgentRunStatus
+from masumi_kodosuni_connector.models.agent_run import FlowRunStatus
 
 
-class JobRequest(BaseModel):
-    data: Dict[str, Any]
+class FlowRunRequest(BaseModel):
+    inputs: Dict[str, Any]
     payment_amount: Optional[float] = None
 
 
-class JobResponse(BaseModel):
+class FlowRunResponse(BaseModel):
     id: int
-    status: AgentRunStatus
+    status: FlowRunStatus
     payment_id: Optional[str] = None
     created_at: datetime
 
 
-class JobStatusResponse(BaseModel):
+class FlowRunStatusResponse(BaseModel):
     id: int
-    status: AgentRunStatus
+    status: FlowRunStatus
     result: Optional[Dict[str, Any]] = None
+    events: Optional[List[Dict[str, Any]]] = None
     error_message: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+
+
+class FlowInfo(BaseModel):
+    key: str
+    name: str
+    description: str
+    version: str
+    author: str
+    tags: List[str]
+
+
+class FlowListResponse(BaseModel):
+    flows: List[FlowInfo]
+
+
+class FlowSchemaResponse(BaseModel):
+    schema: Dict[str, Any]
 
 
 class PaymentRequest(BaseModel):

@@ -2,7 +2,19 @@
   "permissions": {
     "allow": [
       "Bash(mkdir:*)",
-      "Bash(touch:*)"
+      "Bash(touch:*)",
+      "Bash(chmod:*)",
+      "Bash(./setup_sqlite.sh:*)",
+      "Bash(alembic revision:*)",
+      "Bash(python:*)",
+      "Bash(PYTHONPATH=/Users/patricktobler/masumi_kodosuni_connector/src python3 -c \"import masumi_kodosuni_connector; print('Package imported successfully')\")",
+      "Bash(PYTHONPATH=/Users/patricktobler/masumi_kodosuni_connector/src python3 -m masumi_kodosuni_connector.main)",
+      "Bash(PYTHONPATH=/Users/patricktobler/masumi_kodosuni_connector/src /Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13 -c \"import uvicorn; print('uvicorn available')\")",
+      "Bash(./run.sh)",
+      "Bash(/Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13:*)",
+      "Bash(/Library/Frameworks/Python.framework/Versions/3.13/bin/pip3.13 install structlog==23.2.0)",
+      "Bash(timeout:*)",
+      "Bash(/Library/Frameworks/Python.framework/Versions/3.13/bin/pip3.13 install pydantic-settings==2.0.3)"
     ],
     "deny": []
   }

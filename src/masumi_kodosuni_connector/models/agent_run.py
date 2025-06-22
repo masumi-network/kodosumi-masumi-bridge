@@ -7,27 +7,30 @@ from sqlalchemy.ext.declarative import declarative_base
 Base = declarative_base()
 
 
-class AgentRunStatus(str, Enum):
+class FlowRunStatus(str, Enum):
     PENDING_PAYMENT = "pending_payment"
     PAYMENT_CONFIRMED = "payment_confirmed" 
+    STARTING = "starting"
     RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
+    FINISHED = "finished"
+    ERROR = "error"
     CANCELLED = "cancelled"
 
 
-class AgentRun(Base):
-    __tablename__ = "agent_runs"
+class FlowRun(Base):
+    __tablename__ = "flow_runs"
     
     id = Column(Integer, primary_key=True, index=True)
-    agent_key = Column(String(50), nullable=False, index=True)
-    kodosumi_job_id = Column(String(100), unique=True, index=True)
+    flow_path = Column(String(200), nullable=False, index=True)
+    flow_name = Column(String(100), nullable=False)
+    kodosumi_run_id = Column(String(100), unique=True, index=True)
     masumi_payment_id = Column(String(100), index=True)
     
-    status = Column(String(20), nullable=False, default=AgentRunStatus.PENDING_PAYMENT)
+    status = Column(String(20), nullable=False, default=FlowRunStatus.PENDING_PAYMENT)
     
-    request_data = Column(JSON)
+    inputs = Column(JSON)
     result_data = Column(JSON)
+    events = Column(JSON)
     error_message = Column(Text)
     
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

@@ -2,55 +2,56 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
-from masumi_kodosuni_connector.models.agent_run import AgentRun, AgentRunStatus
+from masumi_kodosuni_connector.models.agent_run import FlowRun, FlowRunStatus
 
 
-class AgentRunRepository:
+class FlowRunRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
     
-    async def create(self, agent_key: str, request_data: Dict[str, Any], masumi_payment_id: Optional[str] = None) -> AgentRun:
-        agent_run = AgentRun(
-            agent_key=agent_key,
-            request_data=request_data,
+    async def create(self, flow_path: str, flow_name: str, inputs: Dict[str, Any], masumi_payment_id: Optional[str] = None) -> FlowRun:
+        flow_run = FlowRun(
+            flow_path=flow_path,
+            flow_name=flow_name,
+            inputs=inputs,
             masumi_payment_id=masumi_payment_id,
-            status=AgentRunStatus.PENDING_PAYMENT
+            status=FlowRunStatus.PENDING_PAYMENT
         )
-        self.session.add(agent_run)
+        self.session.add(flow_run)
         await self.session.commit()
-        await self.session.refresh(agent_run)
-        return agent_run
+        await self.session.refresh(flow_run)
+        return flow_run
     
-    async def get_by_id(self, run_id: int) -> Optional[AgentRun]:
+    async def get_by_id(self, run_id: int) -> Optional[FlowRun]:
         result = await self.session.execute(
-            select(AgentRun).where(AgentRun.id == run_id)
+            select(FlowRun).where(FlowRun.id == run_id)
         )
         return result.scalar_one_or_none()
     
-    async def get_by_kodosumi_job_id(self, job_id: str) -> Optional[AgentRun]:
+    async def get_by_kodosumi_run_id(self, run_id: str) -> Optional[FlowRun]:
         result = await self.session.execute(
-            select(AgentRun).where(AgentRun.kodosumi_job_id == job_id)
+            select(FlowRun).where(FlowRun.kodosumi_run_id == run_id)
         )
         return result.scalar_one_or_none()
     
-    async def get_by_masumi_payment_id(self, payment_id: str) -> Optional[AgentRun]:
+    async def get_by_masumi_payment_id(self, payment_id: str) -> Optional[FlowRun]:
         result = await self.session.execute(
-            select(AgentRun).where(AgentRun.masumi_payment_id == payment_id)
+            select(FlowRun).where(FlowRun.masumi_payment_id == payment_id)
         )
         return result.scalar_one_or_none()
     
-    async def update_status(self, run_id: int, status: AgentRunStatus, kodosumi_job_id: Optional[str] = None) -> bool:
+    async def update_status(self, run_id: int, status: FlowRunStatus, kodosumi_run_id: Optional[str] = None) -> bool:
         update_data = {"status": status, "updated_at": datetime.utcnow()}
         
-        if status == AgentRunStatus.RUNNING and kodosumi_job_id:
-            update_data["kodosumi_job_id"] = kodosumi_job_id
+        if status == FlowRunStatus.STARTING and kodosumi_run_id:
+            update_data["kodosumi_run_id"] = kodosumi_run_id
             update_data["started_at"] = datetime.utcnow()
-        elif status in [AgentRunStatus.COMPLETED, AgentRunStatus.FAILED]:
+        elif status in [FlowRunStatus.FINISHED, FlowRunStatus.ERROR]:
             update_data["completed_at"] = datetime.utcnow()
         
         result = await self.session.execute(
-            update(AgentRun)
-            .where(AgentRun.id == run_id)
+            update(FlowRun)
+            .where(FlowRun.id == run_id)
             .values(**update_data)
         )
         await self.session.commit()
@@ -58,20 +59,29 @@ class AgentRunRepository:
     
     async def update_result(self, run_id: int, result_data: Dict[str, Any]) -> bool:
         result = await self.session.execute(
-            update(AgentRun)
-            .where(AgentRun.id == run_id)
+            update(FlowRun)
+            .where(FlowRun.id == run_id)
             .values(result_data=result_data, updated_at=datetime.utcnow())
+        )
+        await self.session.commit()
+        return result.rowcount > 0
+    
+    async def update_events(self, run_id: int, events: List[Dict[str, Any]]) -> bool:
+        result = await self.session.execute(
+            update(FlowRun)
+            .where(FlowRun.id == run_id)
+            .values(events=events, updated_at=datetime.utcnow())
         )
         await self.session.commit()
         return result.rowcount > 0
     
     async def update_error(self, run_id: int, error_message: str) -> bool:
         result = await self.session.execute(
-            update(AgentRun)
-            .where(AgentRun.id == run_id)
+            update(FlowRun)
+            .where(FlowRun.id == run_id)
             .values(
                 error_message=error_message,
-                status=AgentRunStatus.FAILED,
+                status=FlowRunStatus.ERROR,
                 completed_at=datetime.utcnow(),
                 updated_at=datetime.utcnow()
             )
@@ -79,22 +89,23 @@ class AgentRunRepository:
         await self.session.commit()
         return result.rowcount > 0
     
-    async def get_active_runs(self) -> List[AgentRun]:
+    async def get_active_runs(self) -> List[FlowRun]:
         result = await self.session.execute(
-            select(AgentRun).where(
-                AgentRun.status.in_([
-                    AgentRunStatus.PAYMENT_CONFIRMED,
-                    AgentRunStatus.RUNNING
+            select(FlowRun).where(
+                FlowRun.status.in_([
+                    FlowRunStatus.PAYMENT_CONFIRMED,
+                    FlowRunStatus.STARTING,
+                    FlowRunStatus.RUNNING
                 ])
             )
         )
         return result.scalars().all()
     
-    async def get_runs_by_agent(self, agent_key: str, limit: int = 50) -> List[AgentRun]:
+    async def get_runs_by_flow(self, flow_path: str, limit: int = 50) -> List[FlowRun]:
         result = await self.session.execute(
-            select(AgentRun)
-            .where(AgentRun.agent_key == agent_key)
-            .order_by(AgentRun.created_at.desc())
+            select(FlowRun)
+            .where(FlowRun.flow_path == flow_path)
+            .order_by(FlowRun.created_at.desc())
             .limit(limit)
         )
         return result.scalars().all()

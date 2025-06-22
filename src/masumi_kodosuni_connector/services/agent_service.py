@@ -1,91 +1,111 @@
 from typing import Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from masumi_kodosuni_connector.clients.kodosumi_client import KodosumyClient
+from masumi_kodosuni_connector.clients.kodosumi_client import KodosumyClient, KodosumyFlowStatus
 from masumi_kodosuni_connector.clients.masumi_client import MasumiClient
-from masumi_kodosuni_connector.database.repositories import AgentRunRepository
-from masumi_kodosuni_connector.models.agent_run import AgentRun, AgentRunStatus
-from masumi_kodosuni_connector.config.settings import settings
+from masumi_kodosuni_connector.database.repositories import FlowRunRepository
+from masumi_kodosuni_connector.models.agent_run import FlowRun, FlowRunStatus
+from masumi_kodosuni_connector.services.flow_discovery_service import flow_discovery
 
 
-class AgentService:
+class FlowService:
     def __init__(self, session: AsyncSession):
         self.session = session
-        self.repository = AgentRunRepository(session)
+        self.repository = FlowRunRepository(session)
         self.kodosumi_client = KodosumyClient()
         self.masumi_client = MasumiClient()
     
-    async def create_job(self, agent_key: str, job_data: Dict[str, Any], payment_amount: Optional[float] = None) -> AgentRun:
-        if agent_key not in settings.agents_config:
-            raise ValueError(f"Unknown agent: {agent_key}")
+    async def create_flow_run(self, flow_key: str, inputs: Dict[str, Any], payment_amount: Optional[float] = None) -> FlowRun:
+        # Get flow info from discovery service
+        flows = await flow_discovery.get_available_flows()
+        flow_info = flows.get(flow_key)
+        
+        if not flow_info:
+            raise ValueError(f"Unknown flow: {flow_key}")
         
         masumi_payment_id = None
         if payment_amount and payment_amount > 0:
             payment_response = await self.masumi_client.create_payment_request(
                 amount=payment_amount,
-                metadata={"agent_key": agent_key}
+                metadata={"flow_key": flow_key}
             )
             masumi_payment_id = payment_response.get("payment_id")
         
-        agent_run = await self.repository.create(
-            agent_key=agent_key,
-            request_data=job_data,
+        flow_run = await self.repository.create(
+            flow_path=flow_info["url"],
+            flow_name=flow_info["name"],
+            inputs=inputs,
             masumi_payment_id=masumi_payment_id
         )
         
         if not masumi_payment_id:
-            await self._start_kodosumi_job(agent_run)
+            await self._launch_kodosumi_flow(flow_run)
         
-        return agent_run
+        return flow_run
     
-    async def get_job_status(self, run_id: int) -> Optional[AgentRun]:
+    async def get_flow_run_status(self, run_id: int) -> Optional[FlowRun]:
         return await self.repository.get_by_id(run_id)
     
     async def process_payment_confirmation(self, payment_id: str) -> bool:
-        agent_run = await self.repository.get_by_masumi_payment_id(payment_id)
-        if not agent_run:
+        flow_run = await self.repository.get_by_masumi_payment_id(payment_id)
+        if not flow_run:
             return False
         
         is_confirmed = await self.masumi_client.verify_payment(payment_id)
         if is_confirmed:
-            await self.repository.update_status(agent_run.id, AgentRunStatus.PAYMENT_CONFIRMED)
-            await self._start_kodosumi_job(agent_run)
+            await self.repository.update_status(flow_run.id, FlowRunStatus.PAYMENT_CONFIRMED)
+            await self._launch_kodosumi_flow(flow_run)
             return True
         
         return False
     
-    async def _start_kodosumi_job(self, agent_run: AgentRun) -> None:
-        agent_config = settings.agents_config[agent_run.agent_key]
-        
+    async def _launch_kodosumi_flow(self, flow_run: FlowRun) -> None:
         try:
-            job_response = await self.kodosumi_client.start_job(
-                agent_config.kodosumi_agent_id,
-                agent_run.request_data
+            kodosumi_run_id = await self.kodosumi_client.launch_flow(
+                flow_run.flow_path,
+                flow_run.inputs
             )
             
-            kodosumi_job_id = job_response.get("job_id")
-            if kodosumi_job_id:
+            if kodosumi_run_id:
                 await self.repository.update_status(
-                    agent_run.id,
-                    AgentRunStatus.RUNNING,
-                    kodosumi_job_id=kodosumi_job_id
+                    flow_run.id,
+                    FlowRunStatus.STARTING,
+                    kodosumi_run_id=kodosumi_run_id
                 )
         except Exception as e:
-            await self.repository.update_error(agent_run.id, str(e))
+            await self.repository.update_error(flow_run.id, str(e))
     
-    async def update_job_from_kodosumi(self, agent_run: AgentRun) -> None:
-        if not agent_run.kodosumi_job_id:
+    async def update_flow_run_from_kodosumi(self, flow_run: FlowRun) -> None:
+        if not flow_run.kodosumi_run_id:
             return
         
         try:
-            job_status = await self.kodosumi_client.get_job_status(agent_run.kodosumi_job_id)
-            kodosumi_status = job_status.get("status")
+            # Get current status
+            status_data = await self.kodosumi_client.get_flow_status(flow_run.kodosumi_run_id)
+            kodosumi_status = status_data.get("status")
             
-            if kodosumi_status == "completed":
-                result_data = await self.kodosumi_client.get_job_result(agent_run.kodosumi_job_id)
-                await self.repository.update_result(agent_run.id, result_data)
-                await self.repository.update_status(agent_run.id, AgentRunStatus.COMPLETED)
-            elif kodosumi_status == "failed":
-                error_msg = job_status.get("error", "Job failed")
-                await self.repository.update_error(agent_run.id, error_msg)
+            # Map Kodosumi status to our status
+            if kodosumi_status == KodosumyFlowStatus.RUNNING and flow_run.status == FlowRunStatus.STARTING:
+                await self.repository.update_status(flow_run.id, FlowRunStatus.RUNNING)
+            elif kodosumi_status == KodosumyFlowStatus.FINISHED:
+                # Get final result and events
+                result_data = await self.kodosumi_client.get_flow_result(flow_run.kodosumi_run_id)
+                events = await self.kodosumi_client.get_flow_events(flow_run.kodosumi_run_id)
+                
+                await self.repository.update_result(flow_run.id, result_data)
+                await self.repository.update_events(flow_run.id, events)
+                await self.repository.update_status(flow_run.id, FlowRunStatus.FINISHED)
+            elif kodosumi_status == KodosumyFlowStatus.ERROR:
+                # Try to get error details from events
+                events = await self.kodosumi_client.get_flow_events(flow_run.kodosumi_run_id)
+                error_msg = "Flow execution failed"
+                
+                # Look for error events
+                for event in reversed(events):
+                    if event.get("event") == "error":
+                        error_msg = event.get("data", {}).get("message", error_msg)
+                        break
+                
+                await self.repository.update_events(flow_run.id, events)
+                await self.repository.update_error(flow_run.id, error_msg)
         except Exception as e:
-            await self.repository.update_error(agent_run.id, f"Failed to update from Kodosumi: {str(e)}")
+            await self.repository.update_error(flow_run.id, f"Failed to update from Kodosumi: {str(e)}")
