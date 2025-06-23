@@ -1,112 +1,156 @@
 # Masumi Kodosumi Connector
 
-A Python wrapper API for Kodosumi AI Agent jobs with Masumi payment integration.
-
-## Overview
-
-This system provides a wrapper around the Kodosumi API, exposing multiple AI agents through agent-specific endpoints with integrated payment processing via Masumi Node.
+A FastAPI-based wrapper service that integrates Kodosumi AI agents with Masumi payment processing, providing MIP-003 compliant endpoints for secure, payment-gated AI agent execution.
 
 ## Features
 
-- **Multi-Agent Support**: Configure multiple AI agents through environment variables
-- **Agent-Specific URLs**: Each agent accessible through its own base URL (`/{agent_key}/`)
-- **Payment Integration**: Masumi Node integration for payment processing before job execution
-- **Async Job Processing**: Background polling system to track job status and store results
-- **Database Storage**: PostgreSQL storage for job runs, status, and results
-- **Clean Architecture**: Modular design with clear separation of concerns
+- 🔐 **Secure Payment Integration**: Uses Masumi Payment Service for payment processing
+- 🤖 **AI Agent Management**: Connects to multiple Kodosumi AI agents
+- 📋 **MIP-003 Compliant**: Implements MIP-003 specification for job management
+- 🔑 **Per-Agent Configuration**: Individual agent registration with unique identifiers
+- 🛡️ **Security**: UUID-based job IDs, agent-level access control
+- 📊 **Admin Panel**: Web-based management interface
+- 🌐 **Network Support**: Preprod (testnet) and Mainnet support
 
-## Architecture
+## Requirements
 
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Client App    │───▶│  Wrapper API     │───▶│  Kodosumi API   │
-└─────────────────┘    │                  │    └─────────────────┘
-                       │                  │
-                       │                  │    ┌─────────────────┐
-                       │                  │───▶│  Masumi Node    │
-                       └──────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌──────────────────┐
-                       │   PostgreSQL     │
-                       │    Database      │
-                       └──────────────────┘
-```
+**⚠️ Important: This project requires Python 3.12.11 due to the Masumi package dependency.**
 
-## Quick Start Guide
+### System Requirements
+- Python 3.12.11 (required for masumi package)
+- macOS/Linux/Windows
+- 2GB+ RAM
+- Internet connection
 
-### **Prerequisites**
-- Python 3.13 (recommended) or Python 3.11+
-- Git (for cloning/updating the code)
+### Dependencies
+All dependencies are listed in `requirements.txt` and will be installed automatically.
 
-### **Installation Steps**
+## Quick Start
 
-1. **Navigate to the project directory:**
-   ```bash
-   cd /path/to/masumi_kodosuni_connector
-   ```
-
-2. **Install required packages:**
-   ```bash
-   # Install the main dependencies with Python 3.13
-   /Library/Frameworks/Python.framework/Versions/3.13/bin/pip3.13 install fastapi uvicorn sqlalchemy aiosqlite httpx structlog pydantic-settings python-dotenv
-
-   # Or install specific versions for compatibility
-   /Library/Frameworks/Python.framework/Versions/3.13/bin/pip3.13 install fastapi==0.104.1 uvicorn[standard]==0.24.0 sqlalchemy==2.0.23 httpx==0.25.2 structlog==23.2.0 pydantic-settings==2.0.3 python-dotenv==1.0.0 aiosqlite==0.19.0
-   ```
-
-3. **Setup Configuration**:
-   ```bash
-   # Copy the example environment file
-   cp .env.example .env
-   ```
-   
-   Edit `.env` to configure your database:
-   ```bash
-   # For SQLite (recommended for testing)
-   DATABASE_URL=sqlite+aiosqlite:///./masumi_kodosuni.db
-   
-   # For PostgreSQL (production)
-   # DATABASE_URL=postgresql+asyncpg://user:password@localhost/masumi_kodosuni
-   
-   # Kodosumi API Configuration
-   KODOSUMI_BASE_URL=http://209.38.221.56:3370
-   KODOSUMI_USERNAME=admin
-   KODOSUMI_PASSWORD=admin
-   
-   # Masumi Node Configuration (optional for testing)
-   MASUMI_NODE_URL=https://masumi.example.com
-   MASUMI_API_KEY=your_masumi_api_key
-   ```
-
-4. **Start the Service**:
-   ```bash
-   # Option 1: Use the provided script
-   ./run.sh
-   
-   # Option 2: Direct command
-   PYTHONPATH="./src" /Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13 -m masumi_kodosuni_connector.main
-   
-   # Option 3: If you have Python 3.13 as default python3
-   PYTHONPATH="./src" python3 -m masumi_kodosuni_connector.main
-   ```
-
-### **Verify Installation**
-
-Once started, test these endpoints:
+### 1. Clone and Setup
 
 ```bash
-# Health check
-curl http://localhost:8000/health
+git clone <repository-url>
+cd masumi_kodosuni_connector
+```
 
-# List available flows from Kodosumi
-curl http://localhost:8000/flows
+### 2. Create Virtual Environment (Python 3.12 Required)
 
-# MIP-003 global availability  
-curl http://localhost:8000/mip003/availability
+```bash
+# Create virtual environment with Python 3.12
+python3.12 -m venv venv
 
-# Open API documentation in browser
-open http://localhost:8000/docs
+# Activate virtual environment
+source venv/bin/activate  # On Linux/macOS
+# or
+venv\Scripts\activate     # On Windows
+```
+
+### 3. Install Dependencies
+
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### 4. Configuration
+
+Copy the example environment file and configure it:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your settings:
+
+```bash
+# Database Configuration
+DATABASE_URL=sqlite+aiosqlite:///./masumi_kodosuni.db
+
+# Kodosumi API Configuration
+KODOSUMI_BASE_URL=http://209.38.221.56:3370
+KODOSUMI_USERNAME=admin
+KODOSUMI_PASSWORD=admin
+
+# Masumi Payment Service Configuration
+PAYMENT_SERVICE_URL=https://payment.masumi.network/api/v1
+PAYMENT_API_KEY=your_masumi_api_key
+NETWORK=preprod  # Options: preprod (testnet), mainnet
+SELLER_VKEY=your_seller_verification_key
+PAYMENT_AMOUNT=10000000
+PAYMENT_UNIT=lovelace
+MASUMI_TEST_MODE=false
+
+# Agent-specific configurations (only agents with identifiers will be callable)
+AGENT_IDENTIFIER_-_localhost_8001_health-fitness-agent_-_=your-health-agent-id
+AGENT_IDENTIFIER_-_localhost_8001_seo-agent_-_=your-seo-agent-id
+AGENT_IDENTIFIER_-_localhost_8001_meeting-agent_-_=your-meeting-agent-id
+
+# Server Configuration
+HOST=0.0.0.0
+PORT=8000
+DEBUG=false
+```
+
+### 5. Run the Service
+
+#### Option 1: Using the startup script (recommended)
+```bash
+./start.sh
+```
+
+#### Option 2: Manual startup
+```bash
+# Make sure virtual environment is activated
+source venv/bin/activate
+
+# Start the server
+PYTHONPATH=src python -m uvicorn masumi_kodosuni_connector.main:app --host 0.0.0.0 --port 8000
+
+# For development with auto-reload
+PYTHONPATH=src python -m uvicorn masumi_kodosuni_connector.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 6. Access the Service
+
+- **Admin Panel**: http://localhost:8000/admin
+- **API Documentation**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
+
+## Agent Configuration
+
+### Enabling Agents
+
+Only agents with configured identifiers will be accessible via the API. To enable an agent:
+
+1. Stop the server
+2. Add the agent identifier to your `.env` file:
+   ```
+   AGENT_IDENTIFIER_<flow_key>=<your-agent-identifier>
+   ```
+3. Restart the server
+
+### Agent Flow Keys
+
+Available agent flow keys:
+- `-_localhost_8001_health-fitness-agent_-_` - AI Health & Fitness Planner
+- `-_localhost_8001_seo-agent_-_` - SEO Analysis Agent  
+- `-_localhost_8001_meeting-agent_-_` - Meeting Preparation Agent
+- `-_localhost_8001_movie-production-agent_-_` - AI Movie Production Agent
+- `-_localhost_8001_nft-agent_-_` - Content to NFT Agent
+- `-_localhost_8001_llm-txt-agent_-_` - LLMs.txt Generator Agent
+- `-_localhost_8001_media-trend-agent_-_` - Media Trend Analysis Agent
+
+### Example Configuration
+
+```bash
+# Enable 3 agents
+AGENT_IDENTIFIER_-_localhost_8001_health-fitness-agent_-_=health-fitness-masumi-agent
+AGENT_IDENTIFIER_-_localhost_8001_seo-agent_-_=seo-analysis-masumi-agent  
+AGENT_IDENTIFIER_-_localhost_8001_meeting-agent_-_=meeting-prep-masumi-agent
+
+# Disable other agents by commenting them out
+# AGENT_IDENTIFIER_-_localhost_8001_movie-production-agent_-_=movie-production-masumi-agent
 ```
 
 ### **Expected Output**
@@ -289,12 +333,96 @@ GET /mip003/{flow_key}/availability
 
 ### MIP-003 Job Status Flow
 
+The system uses a dual polling architecture to manage job lifecycles:
+
+```
+PENDING_PAYMENT → PAYMENT_CONFIRMED → STARTING → RUNNING → FINISHED
+     ↓                ↓                  ↓          ↓          ↓
+Masumi polling    Payment confirmed   Kodosumi   Job runs   Complete
+   (60s)           → Launch job       polling    polling    + cleanup
+                                      (10s)      (10s)
+```
+
+#### Status Definitions:
 1. `pending` - Job created, awaiting processing
 2. `awaiting_payment` - Waiting for payment confirmation  
 3. `awaiting_input` - Waiting for additional user input
 4. `running` - Job is executing
 5. `completed` - Job finished successfully
 6. `failed` - Job failed or error occurred
+
+#### Polling System:
+- **Masumi Payment Polling**: External system monitors blockchain payments (~60 second intervals)
+- **Internal Job Polling**: Our system checks Kodosumi job progress (10 second intervals)
+- **Configuration**: Set `POLLING_INTERVAL_SECONDS=10` in `.env` to adjust internal polling
+
+### Schema Conversion and Field Type Mapping
+
+The system automatically converts Kodosumi form schemas to MIP-003 compatible input schemas. Some Kodosumi field types are not natively supported by MIP-003 and are converted to strings with specific format requirements.
+
+#### Supported Field Types (Direct Mapping):
+| Kodosumi Type | MIP-003 Type | Description |
+|---------------|--------------|-------------|
+| `text` | `string` | Text input field |
+| `inputtext` | `string` | Text input field |
+| `inputnumber` | `number` | Numeric input |
+| `inputemail` | `string` | Email input (validates as string) |
+| `inputpassword` | `string` | Password input |
+| `textarea` | `string` | Multi-line text |
+| `select` | `option` | Dropdown selection |
+| `checkbox` | `boolean` | Checkbox input |
+| `radio` | `option` | Radio button selection |
+| `slider` | `number` | Numeric slider |
+| `switch` | `boolean` | Toggle switch |
+| `fileupload` | `string` | File upload (converted to string) |
+
+#### Unsupported Field Types (Converted to String):
+| Kodosumi Type | Converted To | Format Required | Example |
+|---------------|--------------|-----------------|---------|
+| `date` | `string` | `YYYY-MM-DD` | `2024-12-25` |
+| `time` | `string` | `HH:MM` | `14:30` |
+| `datetime` | `string` | `YYYY-MM-DD HH:MM` | `2024-12-25 14:30` |
+| `file` | `string` | File path or URL | `/path/to/file.txt` |
+| `color` | `string` | Hex color or name | `#FF0000` or `red` |
+
+#### Example Conversion:
+
+**Kodosumi Schema (with date field):**
+```json
+{
+  "type": "date",
+  "name": "timeframe", 
+  "label": "Start Date (Max 30 days timeframe)",
+  "required": true,
+  "placeholder": "Select start date"
+}
+```
+
+**Converted MIP-003 Schema:**
+```json
+{
+  "id": "timeframe",
+  "type": "string",
+  "name": "Start Date (Max 30 days timeframe)",
+  "data": {
+    "description": "Enter date in YYYY-MM-DD format (e.g., 2024-12-25)",
+    "placeholder": "Select start date"
+  },
+  "validations": null
+}
+```
+
+**User Input Example:**
+When calling the API, users must provide the date as a string:
+```json
+{
+  "input_data": {
+    "timeframe": "2024-06-23",
+    "username": "bmw",
+    "user_query": "What is the general imagery like?"
+  }
+}
+```
 
 ## Testing
 
@@ -310,3 +438,60 @@ pytest
 - **Async/Await**: Fully asynchronous for optimal performance
 - **Error Handling**: Comprehensive error handling and logging
 - **Database Migrations**: Alembic for database schema management
+
+## Virtual Environment Setup
+
+**Important**: Always use the virtual environment with Python 3.12.11:
+
+### Starting the Service (Updated Instructions)
+
+```bash
+# Navigate to project directory
+cd masumi_kodosuni_connector
+
+# Activate virtual environment
+source venv/bin/activate
+
+# Verify Python version
+python --version  # Should show Python 3.12.11
+
+# Start the service
+python -m uvicorn masumi_kodosuni_connector.main:app --host 0.0.0.0 --port 8000
+```
+
+### Stopping the Service
+
+```bash
+# Stop with Ctrl+C if running in foreground
+
+# Or kill by process name
+pkill -f uvicorn
+```
+
+### Troubleshooting Python Version Issues
+
+```bash
+# Check if Python 3.12 is available
+python3.12 --version
+
+# Recreate virtual environment if needed
+rm -rf venv
+python3.12 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+## Configuration Reference
+
+### Network Options
+
+- **preprod**: Testnet for development and testing
+- **mainnet**: Production Cardano network
+
+### Test Mode
+
+When `MASUMI_TEST_MODE=true`:
+- Payments are simulated (5-second delay)
+- No real payment processing occurs
+- Useful for development and testing

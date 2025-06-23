@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Masumi Kodosumi Connector - Admin Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .agent-list {
+            list-style: none;
+        }
+        
+        .agent-item {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #e74c3c;
+        }
+        
+        .agent-item.enabled {
+            border-left-color: #27ae60;
+        }
+        
+        .agent-item.disabled {
+            border-left-color: #e74c3c;
+        }
+        
+        .agent-info {
+            flex: 1;
+        }
+        
+        .agent-name {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .agent-key {
+            font-size: 12px;
+            color: #7f8c8d;
+            font-family: monospace;
+        }
+        
+        .agent-identifier {
+            font-size: 11px;
+            color: #8e44ad;
+            font-family: monospace;
+            margin-top: 2px;
+        }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-enabled {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+        
+        .status-disabled {
+            background: #fdf2f2;
+            color: #e74c3c;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat {
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+        }
+        
+        .refresh-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        
+        .refresh-btn:hover {
+            background: #2980b9;
+        }
+        
+        .network-info {
+            background: #e8f4fd;
+            border: 1px solid #3498db;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .network-info strong {
+            color: #2980b9;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            color: #7f8c8d;
+            padding: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Masumi Kodosumi Connector - Admin Panel</h1>
+            <p>Manage your AI agent configurations and monitor system status</p>
+        </div>
+        
+        <div class="stats" id="stats">
+            <div class="stat">
+                <div class="stat-number" id="total-agents">-</div>
+                <div class="stat-label">Total Agents</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number" id="enabled-agents">-</div>
+                <div class="stat-label">Enabled Agents</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number" id="network-status">-</div>
+                <div class="stat-label">Network</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number" id="test-mode">-</div>
+                <div class="stat-label">Test Mode</div>
+            </div>
+        </div>
+        
+        <div class="grid">
+            <div class="card">
+                <h2>Available Agents</h2>
+                <button class="refresh-btn" onclick="loadAgents()">🔄 Refresh</button>
+                <div class="network-info">
+                    <strong>Network:</strong> <span id="current-network">Loading...</span><br>
+                    <strong>Test Mode:</strong> <span id="current-test-mode">Loading...</span>
+                </div>
+                <div class="loading" id="loading">Loading agents...</div>
+                <ul class="agent-list" id="agent-list">
+                    <!-- Agents will be loaded here -->
+                </ul>
+            </div>
+            
+            <div class="card">
+                <h2>Configuration Guide</h2>
+                <p><strong>To enable an agent:</strong></p>
+                <ol style="margin: 10px 0; padding-left: 20px;">
+                    <li>Stop the server</li>
+                    <li>Add the agent identifier to your .env file:</li>
+                    <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; margin: 10px 0;">AGENT_IDENTIFIER_&lt;flow_key&gt;=&lt;your-agent-id&gt;</pre>
+                    <li>Restart the server</li>
+                </ol>
+                
+                <p><strong>Example:</strong></p>
+                <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; margin: 10px 0;">AGENT_IDENTIFIER_-_localhost_8001_seo-agent_-_=seo-analysis-masumi-agent</pre>
+                
+                <p><strong>Network Options:</strong></p>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li><code>preprod</code> - Testnet for development</li>
+                    <li><code>mainnet</code> - Production network</li>
+                </ul>
+                
+                <p style="margin-top: 15px; font-size: 12px; color: #7f8c8d;">
+                    Note: Only agents with configured identifiers will be callable via the API.
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let allFlows = [];
+        let enabledFlows = [];
+        
+        async function loadAgents() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('agent-list').innerHTML = '';
+            
+            try {
+                // Load all flows from admin endpoint
+                const response = await fetch('/admin/flows');
+                const data = await response.json();
+                
+                allFlows = data.flows || [];
+                
+                // Get system info
+                updateStats(data);
+                updateNetworkInfo(data);
+                
+                // Display all agents (both enabled and disabled)
+                const agentList = document.getElementById('agent-list');
+                
+                if (allFlows.length === 0) {
+                    agentList.innerHTML = '<li style="color: #7f8c8d; padding: 20px; text-align: center;">No agents discovered from Kodosumi. Check your connection.</li>';
+                } else {
+                    allFlows.forEach(flow => {
+                        const listItem = document.createElement('li');
+                        listItem.className = `agent-item ${flow.enabled ? 'enabled' : 'disabled'}`;
+                        
+                        const agentIdentifierText = flow.enabled 
+                            ? `✓ ID: ${flow.agent_identifier || 'configured'}`
+                            : '✗ Not configured';
+                        
+                        listItem.innerHTML = `
+                            <div class="agent-info">
+                                <div class="agent-name">${flow.name || flow.key}</div>
+                                <div class="agent-key">${flow.key}</div>
+                                <div class="agent-identifier">${agentIdentifierText}</div>
+                            </div>
+                            <span class="status-badge ${flow.enabled ? 'status-enabled' : 'status-disabled'}">
+                                ${flow.enabled ? 'Enabled' : 'Disabled'}
+                            </span>
+                        `;
+                        agentList.appendChild(listItem);
+                    });
+                }
+                
+            } catch (error) {
+                console.error('Error loading agents:', error);
+                document.getElementById('agent-list').innerHTML = '<li style="color: #e74c3c; padding: 20px; text-align: center;">Error loading agents. Please check your connection.</li>';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+        
+        function updateStats(data) {
+            document.getElementById('total-agents').textContent = data.total_flows || 0;
+            document.getElementById('enabled-agents').textContent = data.enabled_flows || 0;
+            document.getElementById('network-status').textContent = data.network || 'Unknown';
+            document.getElementById('test-mode').textContent = data.test_mode ? 'On' : 'Off';
+        }
+        
+        function updateNetworkInfo(data) {
+            const networkText = data.network === 'preprod' ? 'preprod (testnet)' : data.network || 'Unknown';
+            document.getElementById('current-network').textContent = networkText;
+            document.getElementById('current-test-mode').textContent = data.test_mode ? 'Enabled' : 'Disabled';
+        }
+        
+        // Load agents on page load
+        document.addEventListener('DOMContentLoaded', loadAgents);
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadAgents, 30000);
+    </script>
+</body>
+</html>

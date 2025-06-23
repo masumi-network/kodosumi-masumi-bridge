@@ -14,7 +14,25 @@
       "Bash(/Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13:*)",
       "Bash(/Library/Frameworks/Python.framework/Versions/3.13/bin/pip3.13 install structlog==23.2.0)",
       "Bash(timeout:*)",
-      "Bash(/Library/Frameworks/Python.framework/Versions/3.13/bin/pip3.13 install pydantic-settings==2.0.3)"
+      "Bash(/Library/Frameworks/Python.framework/Versions/3.13/bin/pip3.13 install pydantic-settings==2.0.3)",
+      "Bash(PYTHONPATH:*)",
+      "Bash(curl:*)",
+      "Bash(lsof:*)",
+      "Bash(pkill:*)",
+      "Bash(cp:*)",
+      "Bash(ls:*)",
+      "Bash(rm:*)",
+      "Bash(find:*)",
+      "Bash(/Library/Frameworks/Python.framework/Versions/3.13/bin/pip3.13 install masumi)",
+      "Bash(pip3 install:*)",
+      "Bash(kill:*)",
+      "Bash(/dev/null)",
+      "Bash(mv:*)",
+      "Bash(cat:*)",
+      "Bash(source:*)",
+      "Bash(pip install:*)",
+      "Bash(grep:*)",
+      "Bash(sed:*)"
     ],
     "deny": []
   }

@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from enum import Enum
 from typing import Optional, Dict, Any
@@ -20,7 +21,12 @@ class FlowRunStatus(str, Enum):
 class FlowRun(Base):
     __tablename__ = "flow_runs"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String(36), primary_key=True, index=True)
+    
+    def __init__(self, **kwargs):
+        if 'id' not in kwargs:
+            kwargs['id'] = str(uuid.uuid4())
+        super().__init__(**kwargs)
     flow_path = Column(String(200), nullable=False, index=True)
     flow_name = Column(String(100), nullable=False)
     kodosumi_run_id = Column(String(100), unique=True, index=True)
@@ -31,6 +37,7 @@ class FlowRun(Base):
     inputs = Column(JSON)
     result_data = Column(JSON)
     events = Column(JSON)
+    payment_response = Column(JSON)
     error_message = Column(Text)
     
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

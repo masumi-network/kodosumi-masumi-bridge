@@ -37,7 +37,7 @@ def create_flow_router(flow_key: str, flow_info: dict) -> APIRouter:
     
     @router.get("/runs/{run_id}", response_model=FlowRunStatusResponse)
     async def get_flow_run_status(
-        run_id: int = Path(..., title="Run ID"),
+        run_id: str = Path(..., title="Run ID"),
         db: AsyncSession = Depends(get_db)
     ):
         service = FlowService(db)
@@ -62,7 +62,7 @@ def create_flow_router(flow_key: str, flow_info: dict) -> APIRouter:
     async def get_flow_schema():
         try:
             schema = await flow_discovery.get_flow_schema(flow_key)
-            return FlowSchemaResponse(schema=schema)
+            return FlowSchemaResponse(flow_schema=schema)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:

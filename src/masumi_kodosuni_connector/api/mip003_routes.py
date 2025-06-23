@@ -39,7 +39,10 @@ def create_mip003_router(flow_key: str, flow_info: dict) -> APIRouter:
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
-            raise HTTPException(status_code=500, detail="Internal server error")
+            import traceback
+            print(f"Start job error: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
     
     @router.get("/status", response_model=JobStatusResponse)
     async def get_job_status(

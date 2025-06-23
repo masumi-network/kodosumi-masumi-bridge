@@ -10,14 +10,14 @@ class FlowRunRequest(BaseModel):
 
 
 class FlowRunResponse(BaseModel):
-    id: int
+    id: str
     status: FlowRunStatus
     payment_id: Optional[str] = None
     created_at: datetime
 
 
 class FlowRunStatusResponse(BaseModel):
-    id: int
+    id: str
     status: FlowRunStatus
     result: Optional[Dict[str, Any]] = None
     events: Optional[List[Dict[str, Any]]] = None
@@ -42,7 +42,7 @@ class FlowListResponse(BaseModel):
 
 
 class FlowSchemaResponse(BaseModel):
-    schema: Dict[str, Any]
+    flow_schema: Dict[str, Any]
 
 
 class PaymentRequest(BaseModel):

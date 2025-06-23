@@ -22,7 +22,7 @@ class FlowRunRepository:
         await self.session.refresh(flow_run)
         return flow_run
     
-    async def get_by_id(self, run_id: int) -> Optional[FlowRun]:
+    async def get_by_id(self, run_id: str) -> Optional[FlowRun]:
         result = await self.session.execute(
             select(FlowRun).where(FlowRun.id == run_id)
         )
@@ -40,7 +40,7 @@ class FlowRunRepository:
         )
         return result.scalar_one_or_none()
     
-    async def update_status(self, run_id: int, status: FlowRunStatus, kodosumi_run_id: Optional[str] = None) -> bool:
+    async def update_status(self, run_id: str, status: FlowRunStatus, kodosumi_run_id: Optional[str] = None) -> bool:
         update_data = {"status": status, "updated_at": datetime.utcnow()}
         
         if status == FlowRunStatus.STARTING and kodosumi_run_id:
@@ -57,7 +57,7 @@ class FlowRunRepository:
         await self.session.commit()
         return result.rowcount > 0
     
-    async def update_result(self, run_id: int, result_data: Dict[str, Any]) -> bool:
+    async def update_result(self, run_id: str, result_data: Dict[str, Any]) -> bool:
         result = await self.session.execute(
             update(FlowRun)
             .where(FlowRun.id == run_id)
@@ -66,7 +66,7 @@ class FlowRunRepository:
         await self.session.commit()
         return result.rowcount > 0
     
-    async def update_events(self, run_id: int, events: List[Dict[str, Any]]) -> bool:
+    async def update_events(self, run_id: str, events: List[Dict[str, Any]]) -> bool:
         result = await self.session.execute(
             update(FlowRun)
             .where(FlowRun.id == run_id)
@@ -75,7 +75,7 @@ class FlowRunRepository:
         await self.session.commit()
         return result.rowcount > 0
     
-    async def update_error(self, run_id: int, error_message: str) -> bool:
+    async def update_error(self, run_id: str, error_message: str) -> bool:
         result = await self.session.execute(
             update(FlowRun)
             .where(FlowRun.id == run_id)
@@ -109,3 +109,23 @@ class FlowRunRepository:
             .limit(limit)
         )
         return result.scalars().all()
+    
+    async def update_payment_id(self, run_id: str, payment_id: str) -> bool:
+        """Update the Masumi payment ID for a flow run."""
+        result = await self.session.execute(
+            update(FlowRun)
+            .where(FlowRun.id == run_id)
+            .values(masumi_payment_id=payment_id, updated_at=datetime.utcnow())
+        )
+        await self.session.commit()
+        return result.rowcount > 0
+    
+    async def update_payment_response(self, run_id: str, payment_response: Dict[str, Any]) -> bool:
+        """Update the payment response data for a flow run."""
+        result = await self.session.execute(
+            update(FlowRun)
+            .where(FlowRun.id == run_id)
+            .values(payment_response=payment_response, updated_at=datetime.utcnow())
+        )
+        await self.session.commit()
+        return result.rowcount > 0

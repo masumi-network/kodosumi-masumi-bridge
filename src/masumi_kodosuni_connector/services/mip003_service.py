@@ -7,6 +7,7 @@ from masumi_kodosuni_connector.services.agent_service import FlowService
 from masumi_kodosuni_connector.services.flow_discovery_service import flow_discovery
 from masumi_kodosuni_connector.services.schema_converter import KodosumyToMIP003Converter
 from masumi_kodosuni_connector.models.agent_run import FlowRun, FlowRunStatus
+from masumi_kodosuni_connector.config.settings import settings
 from masumi_kodosuni_connector.api.mip003_schemas import (
     JobStatus, StartJobResponse, JobStatusResponse, AmountInfo, InputField
 )
@@ -36,59 +37,64 @@ class MIP003Service:
         if not flow_info:
             raise ValueError(f"Unknown flow: {flow_key}")
         
-        # Create the flow run
+        # Convert MIP-003 input data to Kodosumi format
+        try:
+            kodosumi_schema = await flow_discovery.get_flow_schema(flow_key)
+            converted_inputs = self.converter.convert_mip003_to_kodosumi(input_data, kodosumi_schema)
+        except Exception:
+            # Fallback: use input_data as-is if conversion fails
+            converted_inputs = input_data
+        
+        # Create the flow run with Masumi payment integration
         flow_run = await self.flow_service.create_flow_run(
             flow_key=flow_key,
-            inputs=input_data,
+            inputs=converted_inputs,
+            identifier_from_purchaser=identifier_from_purchaser,
             payment_amount=payment_amount
         )
         
-        # Generate MIP-003 required fields
-        current_time = int(time.time())
-        blockchain_identifier = f"block_{uuid.uuid4().hex[:12]}"
-        input_hash = hashlib.md5(str(input_data).encode()).hexdigest()
+        # Get the real payment response data from Masumi
+        payment_response = flow_run.payment_response
+        print(f"DEBUG: Retrieved payment_response: {payment_response}")
+        print(f"DEBUG: Retrieved payment_response type: {type(payment_response)}")
+        print(f"DEBUG: payment_response keys: {payment_response.keys() if payment_response else 'None'}")
+        print(f"DEBUG: input_hash in payment_response: {'input_hash' in payment_response if payment_response else 'No payment_response'}")
+        payment_data = payment_response["data"]
         
-        # Calculate times (example values - adjust based on your requirements)
-        submit_result_time = current_time + (24 * 60 * 60)  # 24 hours
-        unlock_time = current_time + (48 * 60 * 60)  # 48 hours
-        external_dispute_unlock_time = current_time + (72 * 60 * 60)  # 72 hours
-        
-        # Default payment amount if not specified
-        if payment_amount is None:
-            payment_amount = 3.0  # 3 ADA default
-        
+        # Extract amounts from Masumi config
         amounts = [
             AmountInfo(
-                amount=int(payment_amount * 1_000_000),  # Convert ADA to lovelace
-                unit="lovelace"
+                amount=int(settings.payment_amount),
+                unit=settings.payment_unit
             )
         ]
         
         return StartJobResponse(
             status="success",
             job_id=str(flow_run.id),
-            blockchainIdentifier=blockchain_identifier,
-            submitResultTime=submit_result_time,
-            unlockTime=unlock_time,
-            externalDisputeUnlockTime=external_dispute_unlock_time,
-            agentIdentifier=flow_key,
-            sellerVKey="addr1qxlkjl23k4jlksdjfl234jlksdf",  # TODO: Get from actual wallet
+            blockchainIdentifier=payment_data["blockchainIdentifier"],
+            submitResultTime=str(payment_data["submitResultTime"]),
+            unlockTime=str(payment_data["unlockTime"]),
+            externalDisputeUnlockTime=str(payment_data["externalDisputeUnlockTime"]),
+            agentIdentifier=settings.get_agent_identifier(flow_key),
+            sellerVKey=settings.seller_vkey,
             identifierFromPurchaser=identifier_from_purchaser,
             amounts=amounts,
-            input_hash=input_hash
+            input_hash=payment_response.get("input_hash") or payment_response.get("data", {}).get("input_hash", hashlib.md5(str(input_data).encode()).hexdigest())
         )
     
     async def get_job_status(self, job_id: str) -> JobStatusResponse:
         """Get job status following MIP-003 specification."""
         
-        try:
-            job_id_int = int(job_id)
-        except ValueError:
-            raise ValueError("Invalid job_id format")
-        
-        flow_run = await self.flow_service.get_flow_run_status(job_id_int)
+        flow_run = await self.flow_service.get_flow_run_status(job_id)
         if not flow_run:
             raise ValueError("Job not found")
+        
+        print(f"DEBUG: Job {job_id} status check:")
+        print(f"DEBUG: FlowRun status: {flow_run.status}")
+        print(f"DEBUG: FlowRun kodosumi_run_id: {flow_run.kodosumi_run_id}")
+        print(f"DEBUG: FlowRun result_data: {flow_run.result_data}")
+        print(f"DEBUG: FlowRun error_message: {flow_run.error_message}")
         
         # Map FlowRunStatus to MIP-003 JobStatus
         status_mapping = {
@@ -102,6 +108,7 @@ class MIP003Service:
         }
         
         mip003_status = status_mapping.get(flow_run.status, JobStatus.PENDING)
+        print(f"DEBUG: Mapped to MIP-003 status: {mip003_status}")
         
         # Prepare response
         response = JobStatusResponse(
@@ -115,13 +122,17 @@ class MIP003Service:
         elif mip003_status == JobStatus.RUNNING:
             response.message = "Job is being processed"
         elif mip003_status == JobStatus.COMPLETED and flow_run.result_data:
-            response.result = self._format_result(flow_run.result_data)
+            formatted_result = self._format_result(flow_run.result_data)
+            print(f"DEBUG: Formatted result: {formatted_result[:200]}...")
+            response.result = formatted_result
+            response.message = "Job completed successfully"
         elif mip003_status == JobStatus.FAILED and flow_run.error_message:
             response.message = flow_run.error_message
         
         # TODO: Handle awaiting_input status for interactive flows
         # This would require checking Kodosumi events for input requests
         
+        print(f"DEBUG: Final response: status={response.status}, message={response.message}, has_result={bool(response.result)}")
         return response
     
     async def provide_input(self, job_id: str, input_data: Dict[str, Any]) -> bool:
@@ -157,16 +168,33 @@ class MIP003Service:
     def _format_result(self, result_data: Dict[str, Any]) -> str:
         """Format the result data for MIP-003 response."""
         if isinstance(result_data, dict):
-            # Try to extract main result content
+            # First try to extract the main output from Kodosumi format
             if "output" in result_data:
                 return str(result_data["output"])
+            elif "status" in result_data and result_data["status"] == "completed" and "elements" in result_data:
+                # Extract results from Kodosumi elements (new format)
+                elements = result_data["elements"]
+                result_parts = []
+                
+                for element in elements:
+                    if element.get("type") == "markdown" and element.get("text"):
+                        text = element["text"]
+                        # Skip the initial description/header
+                        if len(text) > 200 and any(keyword in text.lower() for keyword in ["result", "analysis", "completed", "generated"]):
+                            result_parts.append(text)
+                    elif element.get("type") == "text" and element.get("value") and len(element["value"]) > 50:
+                        # If a text field has been populated with results
+                        result_parts.append(element["value"])
+                
+                if result_parts:
+                    return "\n\n".join(result_parts)
             elif "result" in result_data:
                 return str(result_data["result"])
             elif "content" in result_data:
                 return str(result_data["content"])
-            else:
-                # Return formatted JSON
-                import json
-                return json.dumps(result_data, indent=2)
+            
+            # Return formatted JSON as fallback
+            import json
+            return json.dumps(result_data, indent=2)
         else:
             return str(result_data)
