@@ -82,9 +82,9 @@ PAYMENT_UNIT=lovelace
 MASUMI_TEST_MODE=false
 
 # Agent-specific configurations (only agents with identifiers will be callable)
-AGENT_IDENTIFIER_-_localhost_8001_health-fitness-agent_-_=your-health-agent-id
-AGENT_IDENTIFIER_-_localhost_8001_seo-agent_-_=your-seo-agent-id
-AGENT_IDENTIFIER_-_localhost_8001_meeting-agent_-_=your-meeting-agent-id
+AGENT_IDENTIFIER_-_localhost_8001_health-fitness-agent_-_=msm_hlth_7x4n9b2vY8kL3zA1
+AGENT_IDENTIFIER_-_localhost_8001_seo-agent_-_=msm_seo_p1z5v9a2c7e4h8j3
+AGENT_IDENTIFIER_-_localhost_8001_meeting-agent_-_=msm_meet_m6q9s1u4x7y0b3f6
 
 # Server Configuration
 HOST=0.0.0.0
@@ -145,12 +145,12 @@ Available agent flow keys:
 
 ```bash
 # Enable 3 agents
-AGENT_IDENTIFIER_-_localhost_8001_health-fitness-agent_-_=health-fitness-masumi-agent
-AGENT_IDENTIFIER_-_localhost_8001_seo-agent_-_=seo-analysis-masumi-agent  
-AGENT_IDENTIFIER_-_localhost_8001_meeting-agent_-_=meeting-prep-masumi-agent
+AGENT_IDENTIFIER_-_localhost_8001_health-fitness-agent_-_=msm_hlth_7x4n9b2vY8kL3zA1
+AGENT_IDENTIFIER_-_localhost_8001_seo-agent_-_=msm_seo_p1z5v9a2c7e4h8j3
+AGENT_IDENTIFIER_-_localhost_8001_meeting-agent_-_=msm_meet_m6q9s1u4x7y0b3f6
 
 # Disable other agents by commenting them out
-# AGENT_IDENTIFIER_-_localhost_8001_movie-production-agent_-_=movie-production-masumi-agent
+# AGENT_IDENTIFIER_-_localhost_8001_movie-production-agent_-_=msm_movie_i9l2o5r8t1w4z7c0
 ```
 
 ### **Expected Output**
@@ -495,3 +495,14 @@ When `MASUMI_TEST_MODE=true`:
 - Payments are simulated (5-second delay)
 - No real payment processing occurs
 - Useful for development and testing
+
+## Security Notes
+
+⚠️ **Important**: All example passwords, API keys, and agent identifiers shown in this documentation are random examples for template purposes only. Replace them with your actual secure credentials before deployment.
+
+**Security Best Practices:**
+- Generate strong random passwords for production
+- Use unique agent identifiers for each deployment
+- Keep your `.env` file secure and never commit it to version control
+- Regularly update passwords and API keys
+- Monitor access logs and system resources

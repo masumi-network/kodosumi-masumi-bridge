@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: masumi_connector
       POSTGRES_USER: masumi_user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-masumi_secure_password_123}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Hj8nK4qW7rT3xZ9mV2cF6bN0pL5uY1eR}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -23,7 +23,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://masumi_user:${POSTGRES_PASSWORD:-masumi_secure_password_123}@postgres:5432/masumi_connector
+      - DATABASE_URL=postgresql+asyncpg://masumi_user:${POSTGRES_PASSWORD:-Hj8nK4qW7rT3xZ9mV2cF6bN0pL5uY1eR}@postgres:5432/masumi_connector
       - KODOSUMI_BASE_URL=${KODOSUMI_BASE_URL}
       - KODOSUMI_USERNAME=${KODOSUMI_USERNAME}
       - KODOSUMI_PASSWORD=${KODOSUMI_PASSWORD}

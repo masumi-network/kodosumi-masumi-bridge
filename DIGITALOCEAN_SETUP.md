@@ -99,7 +99,7 @@ nano .env
 **Required Configuration:**
 ```bash
 # Strong password for PostgreSQL
-POSTGRES_PASSWORD=your_very_secure_password_here
+POSTGRES_PASSWORD=Hj8nK4qW7rT3xZ9mV2cF6bN0pL5uY1eR
 
 # Kodosumi Configuration
 KODOSUMI_BASE_URL=http://209.38.221.56:3370
@@ -108,17 +108,17 @@ KODOSUMI_PASSWORD=admin
 
 # Masumi Payment Configuration
 PAYMENT_SERVICE_URL=https://payment.masumi.network/api/v1
-PAYMENT_API_KEY=your_actual_masumi_api_key
+PAYMENT_API_KEY=msk_A9dG3kF7wP2nR8bX4mQ6vL1eT5yC9zH0
 NETWORK=preprod  # Change to 'mainnet' for production
-SELLER_VKEY=your_actual_seller_verification_key
+SELLER_VKEY=addr1qx4g7m9k3r6w2n8p1z5v0a7c4e9h2j6m3q8s4u1x7y5b9f2i0l8o4r7t3w6z9c2
 PAYMENT_AMOUNT=10000000
 PAYMENT_UNIT=lovelace
 MASUMI_TEST_MODE=false  # Set to false for production
 
 # Agent Configuration (enable the agents you want)
-AGENT_IDENTIFIER_-_127.0.0.1_8001_instagram_-_=your-instagram-agent-id
-AGENT_IDENTIFIER_-_127.0.0.1_8001_linkedin_insights_-_=your-linkedin-agent-id
-AGENT_IDENTIFIER_-_127.0.0.1_8001_newsagent_-_=your-news-agent-id
+AGENT_IDENTIFIER_-_127.0.0.1_8001_instagram_-_=msm_ig_B6kN9dR2wX5pL8m1
+AGENT_IDENTIFIER_-_127.0.0.1_8001_linkedin_insights_-_=msm_li_T4cY7fH0qW3vZ6e9
+AGENT_IDENTIFIER_-_127.0.0.1_8001_newsagent_-_=msm_news_J2nP5sU8xA1kG4m7
 
 # Server Configuration
 HOST=0.0.0.0
@@ -399,13 +399,17 @@ free -h
 
 ## Security Best Practices
 
-1. **Change default passwords**
+1. **Change default passwords**: Use strong random passwords (examples shown are templates)
 2. **Keep system updated**: `apt update && apt upgrade`
 3. **Monitor logs regularly**
 4. **Use strong SSL configuration**
 5. **Regular backups**
 6. **Monitor resource usage**
 7. **Setup log monitoring/alerting**
+
+## Security Notes
+
+⚠️ **Important**: All example passwords, API keys, and agent identifiers shown in this documentation are random examples for template purposes only. Replace them with your actual secure credentials before deployment.
 
 ## Cost Estimation
 
