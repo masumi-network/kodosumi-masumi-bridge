@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: masumi_connector
+      POSTGRES_USER: masumi_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-masumi_secure_password_123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U masumi_user -d masumi_connector"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  masumi-connector:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://masumi_user:${POSTGRES_PASSWORD:-masumi_secure_password_123}@postgres:5432/masumi_connector
+      - KODOSUMI_BASE_URL=${KODOSUMI_BASE_URL}
+      - KODOSUMI_USERNAME=${KODOSUMI_USERNAME}
+      - KODOSUMI_PASSWORD=${KODOSUMI_PASSWORD}
+      - PAYMENT_SERVICE_URL=${PAYMENT_SERVICE_URL}
+      - PAYMENT_API_KEY=${PAYMENT_API_KEY}
+      - NETWORK=${NETWORK}
+      - SELLER_VKEY=${SELLER_VKEY}
+      - PAYMENT_AMOUNT=${PAYMENT_AMOUNT}
+      - PAYMENT_UNIT=${PAYMENT_UNIT}
+      - MASUMI_TEST_MODE=${MASUMI_TEST_MODE}
+      - POLLING_INTERVAL_SECONDS=${POLLING_INTERVAL_SECONDS}
+    volumes:
+      - ./.env:/app/.env
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:

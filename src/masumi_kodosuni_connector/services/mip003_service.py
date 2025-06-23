@@ -170,9 +170,21 @@ class MIP003Service:
         if isinstance(result_data, dict):
             # First try to extract the main output from Kodosumi format
             if "output" in result_data:
-                return str(result_data["output"])
+                output = result_data["output"]
+                # If output is a JSON string, try to parse and extract body
+                if isinstance(output, str):
+                    try:
+                        import json
+                        parsed_output = json.loads(output)
+                        if isinstance(parsed_output, dict) and "Markdown" in parsed_output and "body" in parsed_output["Markdown"]:
+                            return parsed_output["Markdown"]["body"]
+                        elif isinstance(parsed_output, dict) and "body" in parsed_output:
+                            return parsed_output["body"]
+                    except (json.JSONDecodeError, KeyError):
+                        pass
+                return str(output)
             elif "status" in result_data and result_data["status"] == "completed" and "elements" in result_data:
-                # Extract results from Kodosumi elements (new format)
+                # Extract results from Kodosumi elements (old format)
                 elements = result_data["elements"]
                 result_parts = []
                 
