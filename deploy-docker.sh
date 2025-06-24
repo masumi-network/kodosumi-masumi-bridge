@@ -36,6 +36,10 @@ docker-compose up -d
 echo "⏳ Waiting for services to start..."
 sleep 10
 
+# Run database migration to fix payment ID length
+echo "🔧 Running database migration..."
+docker-compose exec -T masumi-connector alembic upgrade head || echo "⚠️  Migration may have already been applied"
+
 # Check health
 echo "🔍 Checking service health..."
 max_attempts=30

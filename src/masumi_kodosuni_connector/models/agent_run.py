@@ -30,7 +30,7 @@ class FlowRun(Base):
     flow_path = Column(String(200), nullable=False, index=True)
     flow_name = Column(String(100), nullable=False)
     kodosumi_run_id = Column(String(100), unique=True, index=True)
-    masumi_payment_id = Column(String(100), index=True)
+    masumi_payment_id = Column(Text, index=True)
     
     status = Column(String(20), nullable=False, default=FlowRunStatus.PENDING_PAYMENT)
     
