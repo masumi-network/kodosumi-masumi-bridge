@@ -128,6 +128,57 @@ def test_convert_optional_field():
     assert validation_dict["optional"] == "true"
 
 
+def test_convert_boolean_field():
+    """Test conversion of a boolean field - should not have optional validation."""
+    kodosumi_element = {
+        "type": "checkbox",
+        "name": "newsletter",
+        "label": "Subscribe to Newsletter",
+        "required": False
+    }
+    
+    converter = KodosumyToMIP003Converter()
+    field = converter._convert_element(kodosumi_element)
+    
+    assert field is not None
+    assert field.id == "newsletter"
+    assert field.type == InputType.BOOLEAN
+    assert field.name == "Subscribe to Newsletter"
+    
+    # Boolean fields should not have optional validation (they default to false)
+    assert field.validations is None or len([v for v in field.validations if v.validation == "optional"]) == 0
+
+
+def test_convert_multiple_select_field():
+    """Test conversion of a multiple select field - should expect array of integers."""
+    kodosumi_element = {
+        "type": "select",
+        "name": "skills",
+        "label": "Skills",
+        "option": [
+            {"name": "js", "label": "JavaScript"},
+            {"name": "py", "label": "Python"},
+            {"name": "go", "label": "Go"}
+        ],
+        "multiple": True,
+        "required": False
+    }
+    
+    converter = KodosumyToMIP003Converter()
+    field = converter._convert_element(kodosumi_element)
+    
+    assert field is not None
+    assert field.id == "skills"
+    assert field.type == InputType.OPTION
+    assert field.name == "Skills"
+    assert field.data.values == ["JavaScript", "Python", "Go"]
+    
+    # Check validations for multiple selection with optional
+    validation_dict = {v.validation: v.value for v in field.validations}
+    assert validation_dict["min"] == 0  # Optional multiple select can have 0 selections
+    assert validation_dict["optional"] == "true"
+
+
 def test_create_simple_schema():
     """Test creation of a simple default schema."""
     converter = KodosumyToMIP003Converter()

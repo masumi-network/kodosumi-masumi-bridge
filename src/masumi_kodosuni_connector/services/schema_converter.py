@@ -174,23 +174,25 @@ class KodosumyToMIP003Converter:
                 validations.append(ValidationRule(validation="format", value="integer"))
         
         elif mip003_type == InputType.OPTION:
-            # For select/option fields, determine min/max selections
+            # Option types always expect an array of integers (indices)
+            # Min/max determine the number of selections allowed
             if element.get("multiple", False):
-                # Multiple selection allowed - default min is 0 unless required
-                min_val = 1 if element.get("required", False) else 0
-                validations.append(ValidationRule(validation="min", value=min_val))
+                # Multiple selection allowed
+                if element.get("required", False):
+                    validations.append(ValidationRule(validation="min", value=1))
+                else:
+                    validations.append(ValidationRule(validation="min", value=0))
                 if "maxSelections" in element:
                     validations.append(ValidationRule(validation="max", value=element["maxSelections"]))
             else:
-                # Single selection - default behavior is required unless explicitly set to optional
-                is_required = element.get("required", True)  # Default to required
-                if is_required:
+                # Single selection - min=1, max=1 for required, or use optional validation
+                if element.get("required", True):  # Default to required unless explicitly optional
                     validations.append(ValidationRule(validation="min", value=1))
                     validations.append(ValidationRule(validation="max", value=1))
-                # For optional single selects, min/max are handled by the optional validation
         
-        # Add optional validation if field is not required  
-        if not element.get("required", False):
+        # Add optional validation if field is not required (but not for boolean fields)
+        # Boolean fields default to false and don't need optional validation
+        if not element.get("required", False) and mip003_type != InputType.BOOLEAN:
             validations.append(ValidationRule(validation="optional", value="true"))
         
         return InputField(
