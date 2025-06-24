@@ -24,11 +24,13 @@ class MasumiPaymentStatus:
 class MasumiClient:
     def __init__(self, flow_key: str):
         self.test_mode = settings.masumi_test_mode
-        self.network = settings.network
+        # Convert network to proper capitalization for masumi package
+        network_lower = settings.network.lower()
+        self.network = "Preprod" if network_lower == "preprod" else "Mainnet" if network_lower == "mainnet" else "Preprod"
         self.flow_key = flow_key
         self.agent_identifier = settings.get_agent_identifier(flow_key)
         self.seller_vkey = settings.seller_vkey
-        self.payment_amount = settings.payment_amount
+        self.payment_amount = int(settings.payment_amount)  # Convert to int as expected by Amount class
         self.payment_unit = settings.payment_unit
         
         if not self.agent_identifier:
@@ -70,9 +72,13 @@ class MasumiClient:
             }
         
         try:
+            # Create amount object for the payment
+            amount = Amount(amount=self.payment_amount, unit=self.payment_unit)
+            
             # Create payment instance
             payment = Payment(
                 agent_identifier=self.agent_identifier,
+                amounts=[amount],
                 config=self.config,
                 identifier_from_purchaser=identifier_from_purchaser,
                 input_data=input_data,
@@ -146,23 +152,23 @@ class MasumiClient:
             logger.error(f"Error checking payment status for job {job_id}: {str(e)}")
             raise
     
-    async def complete_payment(self, job_id: str, payment_id: str, result: Dict[str, Any]) -> None:
+    async def complete_payment(self, job_id: str, blockchain_identifier: str, result: Dict[str, Any]) -> None:
         """Complete the payment after successful job execution."""
         if self.test_mode:
-            logger.info(f"Simulating payment completion for job {job_id}, payment {payment_id}")
+            logger.info(f"Simulating payment completion for job {job_id}, blockchain_identifier {blockchain_identifier}")
             return
         
         if job_id not in self.payment_instances:
             raise ValueError(f"No payment instance found for job {job_id}")
         
         payment = self.payment_instances[job_id]
-        logger.info(f"Completing payment {payment_id} for job {job_id}")
+        logger.info(f"Completing payment {blockchain_identifier} for job {job_id}")
         
         try:
-            await payment.complete_payment(payment_id, result)
-            logger.info(f"Payment {payment_id} completed for job {job_id}")
+            await payment.complete_payment(blockchain_identifier, result)
+            logger.info(f"Payment {blockchain_identifier} completed for job {job_id}")
         except Exception as e:
-            logger.error(f"Error completing payment {payment_id} for job {job_id}: {str(e)}")
+            logger.error(f"Error completing payment {blockchain_identifier} for job {job_id}: {str(e)}")
             raise
     
     def stop_payment_monitoring(self, job_id: str) -> None:

@@ -32,7 +32,8 @@
       "Bash(source:*)",
       "Bash(pip install:*)",
       "Bash(grep:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(pip index:*)"
     ],
     "deny": []
   }

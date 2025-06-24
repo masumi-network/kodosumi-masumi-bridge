@@ -25,7 +25,28 @@ A FastAPI-based wrapper service that integrates Kodosumi AI agents with Masumi p
 ### Dependencies
 All dependencies are listed in `requirements.txt` and will be installed automatically.
 
-## Quick Start
+## 🚀 Quick Production Deployment
+
+**Deploy to DigitalOcean in 5 commands:**
+```bash
+# 1. Create Ubuntu 22.04 droplet at cloud.digitalocean.com
+# 2. Connect and auto-setup
+ssh root@YOUR_DROPLET_IP
+curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/masumi_kodosuni_connector/main/digitalocean-setup.sh | bash
+
+# 3. Upload code and configure
+cd /opt/masumi-connector
+git clone https://github.com/YOUR_USERNAME/masumi_kodosuni_connector.git .
+cp .env.docker .env && nano .env  # Add your credentials
+
+# 4. Deploy
+./deploy-docker.sh
+
+# 5. Access at http://YOUR_DROPLET_IP:8000
+```
+**Cost:** $12-24/month | **Time:** ~25 minutes | **Full Guide:** [See Production Deployment](#production-deployment)
+
+## Quick Start (Local Development)
 
 ### 1. Clone and Setup
 
@@ -422,6 +443,104 @@ When calling the API, users must provide the date as a string:
     "user_query": "What is the general imagery like?"
   }
 }
+```
+
+## Production Deployment
+
+### 🌊 **DigitalOcean Deployment (Recommended)**
+
+Deploy your Masumi Kodosuni Connector to production in ~25 minutes:
+
+#### **Step 1: Create DigitalOcean Droplet**
+1. Go to [cloud.digitalocean.com](https://cloud.digitalocean.com)
+2. Create Ubuntu 22.04 droplet (minimum 2GB RAM, $12/month)
+3. Note your droplet IP address
+
+#### **Step 2: Auto-Setup Server**
+```bash
+# Connect to your droplet
+ssh root@YOUR_DROPLET_IP
+
+# Run automated setup script
+curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/masumi_kodosuni_connector/main/digitalocean-setup.sh | bash
+```
+
+#### **Step 3: Upload Your Code**
+```bash
+cd /opt/masumi-connector
+git clone https://github.com/YOUR_USERNAME/masumi_kodosuni_connector.git .
+```
+
+#### **Step 4: Configure Environment**
+```bash
+cp .env.docker .env
+nano .env
+```
+
+**Update these values with your actual credentials:**
+```bash
+# Strong password for PostgreSQL
+POSTGRES_PASSWORD=YOUR_SECURE_PASSWORD_HERE
+
+# Your Masumi Payment credentials
+PAYMENT_API_KEY=YOUR_ACTUAL_MASUMI_API_KEY
+SELLER_VKEY=YOUR_ACTUAL_SELLER_VERIFICATION_KEY
+NETWORK=preprod  # Change to 'mainnet' for production
+MASUMI_TEST_MODE=false
+
+# Your agent identifiers
+AGENT_IDENTIFIER_-_127.0.0.1_8001_instagram_-_=YOUR_INSTAGRAM_AGENT_ID
+AGENT_IDENTIFIER_-_127.0.0.1_8001_linkedin_insights_-_=YOUR_LINKEDIN_AGENT_ID
+AGENT_IDENTIFIER_-_127.0.0.1_8001_newsagent_-_=YOUR_NEWS_AGENT_ID
+```
+
+#### **Step 5: Deploy**
+```bash
+./deploy-docker.sh
+```
+
+#### **Step 6: Setup SSL (Optional)**
+```bash
+# Point your domain to YOUR_DROPLET_IP, then:
+certbot --nginx -d yourdomain.com
+```
+
+#### **Access Your Application**
+- **Direct**: `http://YOUR_DROPLET_IP:8000`
+- **Domain**: `https://yourdomain.com`
+- **Admin**: `/admin`
+- **API Docs**: `/docs`
+
+#### **Management Commands**
+```bash
+masumi-connector start    # Start services
+masumi-connector stop     # Stop services
+masumi-connector restart  # Restart services
+masumi-connector logs     # View logs
+masumi-connector status   # Check status
+masumi-connector backup   # Create backup
+masumi-connector update   # Update application
+```
+
+**🚀 Total Cost: $12-24/month | Setup Time: ~25 minutes**
+
+📚 **Full DigitalOcean Guide**: See `DIGITALOCEAN_SETUP.md` for detailed instructions.
+
+### 🐳 **Docker Deployment (Alternative)**
+
+For local or other cloud deployments:
+
+```bash
+# Configure environment
+cp .env.docker .env
+nano .env  # Update with your settings
+
+# Deploy with Docker Compose
+docker-compose up -d
+
+# Check status
+docker-compose ps
+curl http://localhost:8000/health
 ```
 
 ## Testing

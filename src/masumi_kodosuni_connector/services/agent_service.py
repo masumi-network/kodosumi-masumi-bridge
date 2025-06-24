@@ -181,13 +181,21 @@ class FlowService:
                 # Complete the payment with Masumi
                 if flow_run.masumi_payment_id:
                     try:
-                        await self.masumi_client.complete_payment(
-                            flow_run.id, 
-                            flow_run.masumi_payment_id, 
-                            result_data
-                        )
-                        # Stop payment monitoring
-                        self.masumi_client.stop_payment_monitoring(flow_run.id)
+                        # Determine flow_key from flow_path
+                        flow_key = flow_run.flow_path.strip('/').replace('/', '_').replace('-', '_')
+                        try:
+                            masumi_client = MasumiClient(flow_key)
+                            await masumi_client.complete_payment(
+                                flow_run.id, 
+                                flow_run.masumi_payment_id, 
+                                result_data
+                            )
+                            # Stop payment monitoring
+                            masumi_client.stop_payment_monitoring(flow_run.id)
+                        except ValueError:
+                            # Agent not configured for payment, skip completion
+                            logger = __import__('structlog').get_logger()
+                            logger.info(f"No agent configured for flow {flow_key}, skipping payment completion")
                     except Exception as e:
                         # Log error but don't fail the job completion
                         logger = __import__('structlog').get_logger()
