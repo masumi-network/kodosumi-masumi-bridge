@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from masumi_kodosuni_connector.database.connection import get_db
 from masumi_kodosuni_connector.services.mip003_service import MIP003Service
@@ -107,7 +108,7 @@ def create_mip003_router(flow_key: str, flow_info: dict) -> APIRouter:
                 message=f"Service check failed: {str(e)}"
             )
     
-    @router.get("/input_schema", response_model=InputSchemaResponse)
+    @router.get("/input_schema")
     async def get_input_schema(
         db: AsyncSession = Depends(get_db)
     ):
@@ -116,7 +117,12 @@ def create_mip003_router(flow_key: str, flow_info: dict) -> APIRouter:
         
         try:
             input_fields = await service.get_input_schema(flow_key)
-            return InputSchemaResponse(input_data=input_fields)
+            response = InputSchemaResponse(input_data=input_fields)
+            # Use custom JSON response to exclude null/unset fields
+            return JSONResponse(
+                content=response.model_dump(exclude_unset=True, exclude_none=True),
+                headers={"Content-Type": "application/json"}
+            )
         except Exception as e:
             raise HTTPException(status_code=500, detail="Failed to get input schema")
     

@@ -92,22 +92,22 @@ class KodosumyToMIP003Converter:
         field_id = element.get("name", f"field_{hash(str(element))}")
         field_name = element.get("label", element.get("text", field_id))
         
-        # Build input data
-        input_data = InputData()
+        # Build input data - only set fields that have values
+        input_data_kwargs = {}
         
         # Add description/placeholder if available
-        if "placeholder" in element:
-            input_data.placeholder = element["placeholder"]
-        if "description" in element:
-            input_data.description = element["description"]
+        if "placeholder" in element and element["placeholder"]:
+            input_data_kwargs["placeholder"] = element["placeholder"]
+        if "description" in element and element["description"]:
+            input_data_kwargs["description"] = element["description"]
         
         # Add format-specific description for unsupported types
         if unsupported_mapping:
             format_description = unsupported_mapping["description"]
-            if input_data.description:
-                input_data.description = f"{input_data.description} | {format_description}"
+            if "description" in input_data_kwargs:
+                input_data_kwargs["description"] = f"{input_data_kwargs['description']} | {format_description}"
             else:
-                input_data.description = format_description
+                input_data_kwargs["description"] = format_description
         
         # Handle option type values (Select, Radio)
         if mip003_type == InputType.OPTION:
@@ -131,7 +131,7 @@ class KodosumyToMIP003Converter:
                         values.append(str(opt))
             
             if values:
-                input_data.values = values
+                input_data_kwargs["values"] = values
         
         # Build the field with only non-empty values
         field_kwargs = {
@@ -141,10 +141,8 @@ class KodosumyToMIP003Converter:
         }
         
         # Only add data if it has actual content
-        if input_data.placeholder or input_data.values or input_data.description:
-            field_kwargs["data"] = input_data
-        
-        # Don't add validations field at all since we're not using validations
+        if input_data_kwargs:
+            field_kwargs["data"] = InputData(**input_data_kwargs)
         
         return InputField(**field_kwargs)
     

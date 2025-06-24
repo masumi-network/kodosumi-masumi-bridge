@@ -21,7 +21,8 @@ def test_convert_simple_text_field():
     assert field.type == InputType.STRING
     assert field.name == "Full Name"
     assert field.data.placeholder == "Enter your full name"
-    assert field.validations is None  # No validations
+    # No validations field (removed from model)
+    assert not hasattr(field, 'validations')
 
 
 def test_convert_email_field():
@@ -44,8 +45,8 @@ def test_convert_email_field():
     assert field.type == InputType.STRING
     assert field.name == "Email Address"
     
-    # No validations
-    assert field.validations is None
+    # No validations field (removed from model)
+    assert not hasattr(field, 'validations')
 
 
 def test_convert_number_field():
@@ -67,8 +68,8 @@ def test_convert_number_field():
     assert field.type == InputType.NUMBER
     assert field.name == "Age"
     
-    # No validations
-    assert field.validations is None
+    # No validations field (removed from model)
+    assert not hasattr(field, 'validations')
 
 
 def test_convert_select_field():
@@ -94,8 +95,8 @@ def test_convert_select_field():
     assert field.name == "Country"
     assert field.data.values == ["United States", "Canada", "United Kingdom"]
     
-    # No validations
-    assert field.validations is None
+    # No validations field (removed from model)
+    assert not hasattr(field, 'validations')
 
 
 def test_convert_optional_field():
@@ -115,8 +116,8 @@ def test_convert_optional_field():
     assert field.type == InputType.STRING
     assert field.name == "Middle Name"
     
-    # No validations
-    assert field.validations is None
+    # No validations field (removed from model)
+    assert not hasattr(field, 'validations')
 
 
 def test_convert_boolean_field():
@@ -136,8 +137,8 @@ def test_convert_boolean_field():
     assert field.type == InputType.BOOLEAN
     assert field.name == "Subscribe to Newsletter"
     
-    # No validations
-    assert field.validations is None
+    # No validations field (removed from model)
+    assert not hasattr(field, 'validations')
 
 
 def test_convert_multiple_select_field():
@@ -164,8 +165,8 @@ def test_convert_multiple_select_field():
     assert field.name == "Skills"
     assert field.data.values == ["JavaScript", "Python", "Go"]
     
-    # No validations
-    assert field.validations is None
+    # No validations field (removed from model)
+    assert not hasattr(field, 'validations')
 
 
 def test_convert_minimal_field():
@@ -186,8 +187,40 @@ def test_convert_minimal_field():
     
     # Should not have data field when there's no placeholder/description/values
     assert not hasattr(field, 'data') or field.data is None
-    # Should not have validations field at all
-    assert not hasattr(field, 'validations') or field.validations is None
+    # Should not have validations field at all (removed from model)
+    assert not hasattr(field, 'validations')
+
+
+def test_json_output_excludes_null_fields():
+    """Test that JSON serialization excludes null/None fields."""
+    import json
+    
+    # Test field with only placeholder
+    kodosumi_element = {
+        "type": "text",
+        "name": "test_field",
+        "label": "Test Field",
+        "placeholder": "Enter text here"
+    }
+    
+    converter = KodosumyToMIP003Converter()
+    field = converter._convert_element(kodosumi_element)
+    
+    # Convert to JSON and parse back to check structure
+    json_str = field.model_dump_json(exclude_unset=True)
+    parsed = json.loads(json_str)
+    
+    # Should have these fields
+    assert "id" in parsed
+    assert "type" in parsed  
+    assert "name" in parsed
+    assert "data" in parsed
+    assert "placeholder" in parsed["data"]
+    
+    # Should NOT have these fields
+    assert "validations" not in parsed  # Field removed from model
+    assert "description" not in parsed["data"]
+    assert "values" not in parsed["data"]
 
 
 def test_create_simple_schema():

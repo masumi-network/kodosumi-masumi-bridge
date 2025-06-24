@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Dict, Any, Optional, List, Union
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
 
 
@@ -29,17 +29,21 @@ class ValidationRule(BaseModel):
 
 
 class InputData(BaseModel):
-    description: Optional[str] = None
-    placeholder: Optional[str] = None
-    values: Optional[List[str]] = None  # For option type
+    model_config = ConfigDict(exclude_none=True, exclude_unset=True)
+    
+    description: Optional[str] = Field(default=None)
+    placeholder: Optional[str] = Field(default=None)
+    values: Optional[List[str]] = Field(default=None)  # For option type
 
 
 class InputField(BaseModel):
+    model_config = ConfigDict(exclude_none=True, exclude_unset=True)
+    
     id: str = Field(..., description="Unique identifier for the input field")
     type: InputType = Field(..., description="Type of the input field")
-    name: Optional[str] = Field(None, description="Display name for the input field")
-    data: Optional[InputData] = Field(None, description="Additional data for the input field")
-    validations: Optional[List[ValidationRule]] = Field(None, description="Validation rules")
+    name: Optional[str] = Field(default=None, description="Display name for the input field")
+    data: Optional[InputData] = Field(default=None, description="Additional data for the input field")
+    # No validations field - we don't use validations
 
 
 # MIP-003 Request/Response Models
@@ -93,4 +97,6 @@ class AvailabilityResponse(BaseModel):
 
 
 class InputSchemaResponse(BaseModel):
+    model_config = ConfigDict(exclude_none=True, exclude_unset=True)
+    
     input_data: List[InputField] = Field(..., description="Expected input schema")
