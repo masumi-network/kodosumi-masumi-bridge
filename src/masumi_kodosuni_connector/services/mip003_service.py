@@ -69,6 +69,20 @@ class MIP003Service:
             )
         ]
         
+        # Extract payByTime from Masumi payment response (masumi package provides this field)
+        pay_by_time = payment_data.get("payByTime")
+        if not pay_by_time:
+            # Fallback: calculate as 1 hour before submitResultTime if somehow missing
+            submit_result_time = int(payment_data["submitResultTime"])
+            pay_by_time = submit_result_time - (60 * 60)
+        else:
+            # Convert ISO format to timestamp if needed
+            if isinstance(pay_by_time, str) and pay_by_time.endswith('Z'):
+                from datetime import datetime
+                pay_by_time = int(datetime.fromisoformat(pay_by_time.replace('Z', '+00:00')).timestamp())
+            elif isinstance(pay_by_time, str):
+                pay_by_time = int(pay_by_time)
+        
         return StartJobResponse(
             status="success",
             job_id=str(flow_run.id),
@@ -76,6 +90,7 @@ class MIP003Service:
             submitResultTime=str(payment_data["submitResultTime"]),
             unlockTime=str(payment_data["unlockTime"]),
             externalDisputeUnlockTime=str(payment_data["externalDisputeUnlockTime"]),
+            payByTime=str(pay_by_time),
             agentIdentifier=settings.get_agent_identifier(flow_key),
             sellerVKey=settings.seller_vkey,
             identifierFromPurchaser=identifier_from_purchaser,

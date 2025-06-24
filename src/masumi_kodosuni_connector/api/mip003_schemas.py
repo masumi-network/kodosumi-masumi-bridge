@@ -61,6 +61,7 @@ class StartJobResponse(BaseModel):
     submitResultTime: str = Field(..., description="Unix timestamp when result must be submitted")
     unlockTime: str = Field(..., description="Unix timestamp when payment can be unlocked")
     externalDisputeUnlockTime: str = Field(..., description="Unix timestamp until disputes can happen")
+    payByTime: str = Field(..., description="Unix timestamp by which payment must be made")
     agentIdentifier: str = Field(..., description="Agent identifier from registration")
     sellerVKey: str = Field(..., description="Wallet public key")
     identifierFromPurchaser: str = Field(..., description="Echoes back purchaser identifier")

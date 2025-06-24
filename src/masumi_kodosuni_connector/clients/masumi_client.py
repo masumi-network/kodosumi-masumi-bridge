@@ -56,7 +56,7 @@ class MasumiClient:
         logger.info(f"Creating payment request for job {job_id}")
         
         if self.test_mode:
-            # Simulate payment request creation
+            # Simulate payment request creation matching masumi package format
             current_time = int(time.time())
             blockchain_identifier = f"test_block_{uuid.uuid4().hex[:12]}"
             input_hash = hashlib.md5(str(input_data).encode()).hexdigest()
@@ -64,6 +64,7 @@ class MasumiClient:
             return {
                 "data": {
                     "blockchainIdentifier": blockchain_identifier,
+                    "payByTime": current_time + (12 * 60 * 60),  # 12 hours (as per masumi package)
                     "submitResultTime": current_time + (24 * 60 * 60),  # 24 hours
                     "unlockTime": current_time + (48 * 60 * 60),  # 48 hours
                     "externalDisputeUnlockTime": current_time + (72 * 60 * 60),  # 72 hours
