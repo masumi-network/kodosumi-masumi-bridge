@@ -133,74 +133,15 @@ class KodosumyToMIP003Converter:
             if values:
                 input_data.values = values
         
-        # Build validations
-        validations = []
-        
-        # Handle specific validations based on type
-        if mip003_type == InputType.STRING:
-            # Handle different field name patterns for min/max
-            if "min" in element:
-                validations.append(ValidationRule(validation="min", value=element["min"]))
-            elif "min_length" in element:
-                validations.append(ValidationRule(validation="min", value=element["min_length"]))
-            
-            if "max" in element:
-                validations.append(ValidationRule(validation="max", value=element["max"]))
-            elif "max_length" in element:
-                validations.append(ValidationRule(validation="max", value=element["max_length"]))
-            
-            # Handle format validations
-            if element_type == "inputemail" or element.get("pattern") == "email":
-                validations.append(ValidationRule(validation="format", value="email"))
-            elif element_type == "inputurl":
-                validations.append(ValidationRule(validation="format", value="url"))
-        
-        elif mip003_type == InputType.NUMBER:
-            # Handle different field name patterns for min/max
-            if "min" in element:
-                validations.append(ValidationRule(validation="min", value=element["min"]))
-            elif "min_value" in element:
-                validations.append(ValidationRule(validation="min", value=element["min_value"]))
-            
-            if "max" in element:
-                validations.append(ValidationRule(validation="max", value=element["max"]))
-            elif "max_value" in element:
-                validations.append(ValidationRule(validation="max", value=element["max_value"]))
-            
-            if "step" in element and element["step"] == 1:
-                validations.append(ValidationRule(validation="format", value="integer"))
-            # Default to integer format for number inputs if no step specified
-            elif "step" not in element:
-                validations.append(ValidationRule(validation="format", value="integer"))
-        
-        elif mip003_type == InputType.OPTION:
-            # Option types always expect an array of integers (indices)
-            # Min/max determine the number of selections allowed
-            if element.get("multiple", False):
-                # Multiple selection allowed
-                if element.get("required", False):
-                    validations.append(ValidationRule(validation="min", value=1))
-                else:
-                    validations.append(ValidationRule(validation="min", value=0))
-                if "maxSelections" in element:
-                    validations.append(ValidationRule(validation="max", value=element["maxSelections"]))
-            else:
-                # Single selection - min=1, max=1 for required, or use optional validation
-                if element.get("required", True):  # Default to required unless explicitly optional
-                    validations.append(ValidationRule(validation="min", value=1))
-                    validations.append(ValidationRule(validation="max", value=1))
-        
-        # Add optional validation if field is not required (but not for boolean fields)
-        # Boolean fields default to false and don't need optional validation
-        if not element.get("required", False) and mip003_type != InputType.BOOLEAN:
-            validations.append(ValidationRule(validation="optional", value="true"))
+        # No validations - keeping it simple
+        validations = None
         
         return InputField(
             id=field_id,
             type=mip003_type,
             name=field_name,
             data=input_data if input_data.placeholder or input_data.values or input_data.description else None,
-            validations=validations if validations else None
+            validations=None
         )
     
     @staticmethod
@@ -239,9 +180,6 @@ class KodosumyToMIP003Converter:
                     description=f"Input prompt for {flow_name}",
                     placeholder="Enter your request here..."
                 ),
-                validations=[
-                    ValidationRule(validation="min", value=1),
-                    ValidationRule(validation="format", value="nonempty")
-                ]
+                validations=None
             )
         ]

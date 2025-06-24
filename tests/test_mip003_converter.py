@@ -21,7 +21,7 @@ def test_convert_simple_text_field():
     assert field.type == InputType.STRING
     assert field.name == "Full Name"
     assert field.data.placeholder == "Enter your full name"
-    assert field.validations is None  # No explicit validations since required is default
+    assert field.validations is None  # No validations
 
 
 def test_convert_email_field():
@@ -44,11 +44,8 @@ def test_convert_email_field():
     assert field.type == InputType.STRING
     assert field.name == "Email Address"
     
-    # Check validations
-    validation_dict = {v.validation: v.value for v in field.validations}
-    assert validation_dict["min"] == 5
-    assert validation_dict["max"] == 100
-    assert validation_dict["format"] == "email"
+    # No validations
+    assert field.validations is None
 
 
 def test_convert_number_field():
@@ -70,11 +67,8 @@ def test_convert_number_field():
     assert field.type == InputType.NUMBER
     assert field.name == "Age"
     
-    # Check validations
-    validation_dict = {v.validation: v.value for v in field.validations}
-    assert validation_dict["min"] == 18
-    assert validation_dict["max"] == 120
-    assert validation_dict["format"] == "integer"
+    # No validations
+    assert field.validations is None
 
 
 def test_convert_select_field():
@@ -100,10 +94,8 @@ def test_convert_select_field():
     assert field.name == "Country"
     assert field.data.values == ["United States", "Canada", "United Kingdom"]
     
-    # Check validations for single selection
-    validation_dict = {v.validation: v.value for v in field.validations}
-    assert validation_dict["min"] == 1
-    assert validation_dict["max"] == 1
+    # No validations
+    assert field.validations is None
 
 
 def test_convert_optional_field():
@@ -123,9 +115,8 @@ def test_convert_optional_field():
     assert field.type == InputType.STRING
     assert field.name == "Middle Name"
     
-    # Check for optional validation
-    validation_dict = {v.validation: v.value for v in field.validations}
-    assert validation_dict["optional"] == "true"
+    # No validations
+    assert field.validations is None
 
 
 def test_convert_boolean_field():
@@ -145,8 +136,8 @@ def test_convert_boolean_field():
     assert field.type == InputType.BOOLEAN
     assert field.name == "Subscribe to Newsletter"
     
-    # Boolean fields should not have optional validation (they default to false)
-    assert field.validations is None or len([v for v in field.validations if v.validation == "optional"]) == 0
+    # No validations
+    assert field.validations is None
 
 
 def test_convert_multiple_select_field():
@@ -173,10 +164,8 @@ def test_convert_multiple_select_field():
     assert field.name == "Skills"
     assert field.data.values == ["JavaScript", "Python", "Go"]
     
-    # Check validations for multiple selection with optional
-    validation_dict = {v.validation: v.value for v in field.validations}
-    assert validation_dict["min"] == 0  # Optional multiple select can have 0 selections
-    assert validation_dict["optional"] == "true"
+    # No validations
+    assert field.validations is None
 
 
 def test_create_simple_schema():
