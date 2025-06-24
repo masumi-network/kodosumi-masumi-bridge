@@ -125,7 +125,7 @@ def test_convert_optional_field():
     
     # Check for optional validation
     validation_dict = {v.validation: v.value for v in field.validations}
-    assert validation_dict["optional"] is True
+    assert validation_dict["optional"] == "true"
 
 
 def test_create_simple_schema():

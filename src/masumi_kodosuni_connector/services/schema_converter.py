@@ -33,8 +33,10 @@ class KodosumyToMIP003Converter:
         type_mapping = {
             "text": InputType.STRING,
             "inputtext": InputType.STRING,
-            "inputnumber": InputType.NUMBER, 
+            "inputnumber": InputType.NUMBER,
+            "number": InputType.NUMBER,
             "inputemail": InputType.STRING,
+            "inputurl": InputType.STRING,
             "inputpassword": InputType.STRING,
             "textarea": InputType.STRING,
             "select": InputType.OPTION,
@@ -108,53 +110,88 @@ class KodosumyToMIP003Converter:
                 input_data.description = format_description
         
         # Handle option type values (Select, Radio)
-        if mip003_type == InputType.OPTION and "options" in element:
+        if mip003_type == InputType.OPTION:
             values = []
-            options = element["options"] if isinstance(element["options"], list) else [element["options"]]
-            for opt in options:
-                if isinstance(opt, dict):
-                    # Option can have 'label' and 'value' properties
-                    values.append(opt.get("label", opt.get("value", str(opt))))
-                else:
-                    values.append(str(opt))
-            input_data.values = values
+            # Check for different option formats
+            if "options" in element:
+                options = element["options"] if isinstance(element["options"], list) else [element["options"]]
+                for opt in options:
+                    if isinstance(opt, dict):
+                        # Option can have 'label' and 'value' properties
+                        values.append(opt.get("label", opt.get("value", str(opt))))
+                    else:
+                        values.append(str(opt))
+            elif "option" in element:
+                options = element["option"] if isinstance(element["option"], list) else [element["option"]]
+                for opt in options:
+                    if isinstance(opt, dict):
+                        # Option can have 'label', 'name' and 'value' properties
+                        values.append(opt.get("label", opt.get("name", opt.get("value", str(opt)))))
+                    else:
+                        values.append(str(opt))
+            
+            if values:
+                input_data.values = values
         
         # Build validations
         validations = []
         
-        # Handle required field
-        if not element.get("required", False):
-            # Field is optional unless marked as required
-            validations.append(ValidationRule(validation="optional", value=True))
-        
         # Handle specific validations based on type
         if mip003_type == InputType.STRING:
+            # Handle different field name patterns for min/max
             if "min" in element:
                 validations.append(ValidationRule(validation="min", value=element["min"]))
+            elif "min_length" in element:
+                validations.append(ValidationRule(validation="min", value=element["min_length"]))
+            
             if "max" in element:
                 validations.append(ValidationRule(validation="max", value=element["max"]))
-            if element_type == "inputemail":
+            elif "max_length" in element:
+                validations.append(ValidationRule(validation="max", value=element["max_length"]))
+            
+            # Handle format validations
+            if element_type == "inputemail" or element.get("pattern") == "email":
                 validations.append(ValidationRule(validation="format", value="email"))
+            elif element_type == "inputurl":
+                validations.append(ValidationRule(validation="format", value="url"))
         
         elif mip003_type == InputType.NUMBER:
+            # Handle different field name patterns for min/max
             if "min" in element:
                 validations.append(ValidationRule(validation="min", value=element["min"]))
+            elif "min_value" in element:
+                validations.append(ValidationRule(validation="min", value=element["min_value"]))
+            
             if "max" in element:
                 validations.append(ValidationRule(validation="max", value=element["max"]))
+            elif "max_value" in element:
+                validations.append(ValidationRule(validation="max", value=element["max_value"]))
+            
             if "step" in element and element["step"] == 1:
+                validations.append(ValidationRule(validation="format", value="integer"))
+            # Default to integer format for number inputs if no step specified
+            elif "step" not in element:
                 validations.append(ValidationRule(validation="format", value="integer"))
         
         elif mip003_type == InputType.OPTION:
             # For select/option fields, determine min/max selections
             if element.get("multiple", False):
-                # Multiple selection allowed
-                validations.append(ValidationRule(validation="min", value=0))
+                # Multiple selection allowed - default min is 0 unless required
+                min_val = 1 if element.get("required", False) else 0
+                validations.append(ValidationRule(validation="min", value=min_val))
                 if "maxSelections" in element:
                     validations.append(ValidationRule(validation="max", value=element["maxSelections"]))
             else:
-                # Single selection
-                validations.append(ValidationRule(validation="min", value=1))
-                validations.append(ValidationRule(validation="max", value=1))
+                # Single selection - default behavior is required unless explicitly set to optional
+                is_required = element.get("required", True)  # Default to required
+                if is_required:
+                    validations.append(ValidationRule(validation="min", value=1))
+                    validations.append(ValidationRule(validation="max", value=1))
+                # For optional single selects, min/max are handled by the optional validation
+        
+        # Add optional validation if field is not required  
+        if not element.get("required", False):
+            validations.append(ValidationRule(validation="optional", value="true"))
         
         return InputField(
             id=field_id,
