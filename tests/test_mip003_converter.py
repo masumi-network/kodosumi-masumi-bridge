@@ -168,6 +168,28 @@ def test_convert_multiple_select_field():
     assert field.validations is None
 
 
+def test_convert_minimal_field():
+    """Test conversion of a minimal field with no extra data."""
+    kodosumi_element = {
+        "type": "text",
+        "name": "simple_field",
+        "label": "Simple Field"
+    }
+    
+    converter = KodosumyToMIP003Converter()
+    field = converter._convert_element(kodosumi_element)
+    
+    assert field is not None
+    assert field.id == "simple_field"
+    assert field.type == InputType.STRING
+    assert field.name == "Simple Field"
+    
+    # Should not have data field when there's no placeholder/description/values
+    assert not hasattr(field, 'data') or field.data is None
+    # Should not have validations field at all
+    assert not hasattr(field, 'validations') or field.validations is None
+
+
 def test_create_simple_schema():
     """Test creation of a simple default schema."""
     converter = KodosumyToMIP003Converter()

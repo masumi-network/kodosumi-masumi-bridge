@@ -133,16 +133,20 @@ class KodosumyToMIP003Converter:
             if values:
                 input_data.values = values
         
-        # No validations - keeping it simple
-        validations = None
+        # Build the field with only non-empty values
+        field_kwargs = {
+            "id": field_id,
+            "type": mip003_type,
+            "name": field_name,
+        }
         
-        return InputField(
-            id=field_id,
-            type=mip003_type,
-            name=field_name,
-            data=input_data if input_data.placeholder or input_data.values or input_data.description else None,
-            validations=None
-        )
+        # Only add data if it has actual content
+        if input_data.placeholder or input_data.values or input_data.description:
+            field_kwargs["data"] = input_data
+        
+        # Don't add validations field at all since we're not using validations
+        
+        return InputField(**field_kwargs)
     
     @staticmethod
     def convert_mip003_to_kodosumi(input_data: Dict[str, Any], kodosumi_schema: Dict[str, Any]) -> Dict[str, Any]:
@@ -179,7 +183,6 @@ class KodosumyToMIP003Converter:
                 data=InputData(
                     description=f"Input prompt for {flow_name}",
                     placeholder="Enter your request here..."
-                ),
-                validations=None
+                )
             )
         ]
