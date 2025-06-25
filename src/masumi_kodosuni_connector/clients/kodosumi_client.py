@@ -239,11 +239,41 @@ class KodosumyClient:
             final_result = status_data.get("final")
             if final_result:
                 print(f"DEBUG: Found final result in new API format")
-                return {
-                    "output": final_result,
-                    "status": "completed",
-                    "raw_response": status_data
-                }
+                
+                # Parse the final result JSON to extract actual content
+                try:
+                    import json
+                    final_data = json.loads(final_result)
+                    
+                    # Extract meaningful content from common structures
+                    actual_content = final_result  # fallback to raw
+                    
+                    if isinstance(final_data, dict):
+                        # Look for common output patterns
+                        if "CrewOutput" in final_data and "raw" in final_data["CrewOutput"]:
+                            actual_content = final_data["CrewOutput"]["raw"]
+                        elif "raw" in final_data:
+                            actual_content = final_data["raw"]
+                        elif "output" in final_data:
+                            actual_content = final_data["output"]
+                        elif "result" in final_data:
+                            actual_content = final_data["result"]
+                        elif "content" in final_data:
+                            actual_content = final_data["content"]
+                    
+                    print(f"DEBUG: Extracted actual content from final JSON")
+                    return {
+                        "output": actual_content,
+                        "status": "completed",
+                        "raw_response": status_data
+                    }
+                except json.JSONDecodeError:
+                    print(f"DEBUG: Could not parse final result as JSON, using as-is")
+                    return {
+                        "output": final_result,
+                        "status": "completed",
+                        "raw_response": status_data
+                    }
             
             # Old API format: extract from elements
             elements = status_data.get("elements", [])
