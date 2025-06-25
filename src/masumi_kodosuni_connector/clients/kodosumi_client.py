@@ -106,16 +106,44 @@ class KodosumyClient:
     
     async def get_available_flows(self) -> List[Dict[str, Any]]:
         cookies = await self._ensure_authenticated()
+        all_flows = []
+        offset = 0
         
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{self.base_url}/flow",
-                cookies=cookies,
-                timeout=30.0
-            )
-            response.raise_for_status()
-            data = response.json()
-            return data.get("items", [])
+            while True:
+                # Request flows with offset for pagination
+                url = f"{self.base_url}/flow"
+                if offset > 0:
+                    url += f"?offset={offset}"
+                
+                response = await client.get(
+                    url,
+                    cookies=cookies,
+                    timeout=30.0
+                )
+                response.raise_for_status()
+                data = response.json()
+                
+                items = data.get("items", [])
+                if not items:
+                    # No more items, break pagination loop
+                    break
+                
+                all_flows.extend(items)
+                
+                # Check if there's more data (offset-based pagination)
+                current_offset = data.get("offset")
+                if current_offset is None:
+                    # No offset in response means no more pages
+                    break
+                
+                # Update offset for next request
+                offset = current_offset
+                
+                print(f"DEBUG: Retrieved {len(items)} flows, total so far: {len(all_flows)}")
+        
+        print(f"DEBUG: Retrieved total of {len(all_flows)} flows")
+        return all_flows
     
     async def get_flow_schema(self, flow_path: str) -> Dict[str, Any]:
         cookies = await self._ensure_authenticated()
