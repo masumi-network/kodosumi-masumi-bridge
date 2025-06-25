@@ -11,8 +11,42 @@ import os
 import json
 from typing import List, Dict, Any
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+
+# Load .env from the project root
+project_root = os.path.join(os.path.dirname(__file__), '..')
+env_file = os.path.join(project_root, '.env')
+
+# Try multiple possible .env locations
+possible_env_files = [
+    env_file,
+    '/root/kodosumi-masumi-bridge/.env',
+    os.path.join(os.getcwd(), '.env'),
+    '.env'
+]
+
+env_loaded = False
+for env_path in possible_env_files:
+    if os.path.exists(env_path):
+        print(f"Loading environment from: {env_path}")
+        load_dotenv(env_path)
+        env_loaded = True
+        break
+
+if not env_loaded:
+    print("ERROR: Could not find .env file in any of these locations:")
+    for env_path in possible_env_files:
+        print(f"  - {env_path}")
+    print("\nPlease run this script from the project root directory where .env is located")
+    sys.exit(1)
+
+# Debug: Show some environment variables
+print(f"DATABASE_URL set: {'DATABASE_URL' in os.environ}")
+print(f"KODOSUMI_BASE_URL set: {'KODOSUMI_BASE_URL' in os.environ}")
+
 # Add the src directory to the path so we can import our modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(project_root, 'src'))
 
 from masumi_kodosuni_connector.database.connection import AsyncSessionLocal
 from masumi_kodosuni_connector.models.agent_run import FlowRun, FlowRunStatus
