@@ -92,7 +92,7 @@ class MIP003Service:
             externalDisputeUnlockTime=str(payment_data["externalDisputeUnlockTime"]),
             payByTime=str(pay_by_time),
             agentIdentifier=settings.get_agent_identifier(flow_key),
-            sellerVKey=settings.seller_vkey,
+            sellerVKey=payment_response.get("data", {}).get("SmartContractWallet", {}).get("walletVkey", settings.seller_vkey),
             identifierFromPurchaser=identifier_from_purchaser,
             amounts=amounts,
             input_hash=payment_response.get("input_hash") or payment_response.get("data", {}).get("input_hash", hashlib.md5(str(input_data).encode()).hexdigest())
