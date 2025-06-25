@@ -36,6 +36,10 @@ class MasumiClient:
             raise ValueError(f"No agent identifier configured for flow: {flow_key}")
         
         if not self.test_mode:
+            print(f"DEBUG: Configuring masumi with full API key: '{settings.payment_api_key}'")
+            print(f"DEBUG: API key length: {len(settings.payment_api_key)}")
+            print(f"DEBUG: Payment service URL: {settings.payment_service_url}")
+            print(f"DEBUG: Network: {self.network}")
             self.config = Config(
                 payment_service_url=settings.payment_service_url,
                 payment_api_key=settings.payment_api_key
