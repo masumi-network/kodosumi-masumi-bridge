@@ -30,8 +30,7 @@ class MasumiClient:
         self.flow_key = flow_key
         self.agent_identifier = settings.get_agent_identifier(flow_key)
         self.seller_vkey = settings.seller_vkey
-        self.payment_amount = int(settings.payment_amount)  # Convert to int as expected by Amount class
-        self.payment_unit = settings.payment_unit
+        # Note: payment amounts are handled by the masumi package, not configured here
         
         if not self.agent_identifier:
             raise ValueError(f"No agent identifier configured for flow: {flow_key}")
@@ -73,13 +72,9 @@ class MasumiClient:
             }
         
         try:
-            # Create amount object for the payment
-            amount = Amount(amount=self.payment_amount, unit=self.payment_unit)
-            
-            # Create payment instance
+            # Create payment instance (amounts are handled by the masumi package)
             payment = Payment(
                 agent_identifier=self.agent_identifier,
-                amounts=[amount],
                 config=self.config,
                 identifier_from_purchaser=identifier_from_purchaser,
                 input_data=input_data,

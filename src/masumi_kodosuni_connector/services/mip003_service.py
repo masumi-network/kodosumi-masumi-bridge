@@ -61,13 +61,14 @@ class MIP003Service:
         print(f"DEBUG: input_hash in payment_response: {'input_hash' in payment_response if payment_response else 'No payment_response'}")
         payment_data = payment_response["data"]
         
-        # Extract amounts from Masumi config
-        amounts = [
-            AmountInfo(
-                amount=int(settings.payment_amount),
-                unit=settings.payment_unit
-            )
-        ]
+        # Extract amounts from Masumi payment response (amounts are set by the masumi package)
+        requested_funds = payment_data.get("RequestedFunds", [])
+        amounts = []
+        for fund in requested_funds:
+            amounts.append(AmountInfo(
+                amount=int(fund.get("amount", 0)),
+                unit=fund.get("unit", "lovelace")
+            ))
         
         # Extract payByTime from Masumi payment response (masumi package provides this field)
         pay_by_time = payment_data.get("payByTime")
