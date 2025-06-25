@@ -108,6 +108,7 @@ class KodosumyClient:
         cookies = await self._ensure_authenticated()
         all_flows = []
         offset = 0
+        page_size = 10  # Default page size, we'll try to determine this
         
         async with httpx.AsyncClient() as client:
             while True:
@@ -116,6 +117,7 @@ class KodosumyClient:
                 if offset > 0:
                     url += f"?offset={offset}"
                 
+                print(f"DEBUG: Requesting flows from URL: {url}")
                 response = await client.get(
                     url,
                     cookies=cookies,
@@ -124,23 +126,37 @@ class KodosumyClient:
                 response.raise_for_status()
                 data = response.json()
                 
+                print(f"DEBUG: Response keys: {list(data.keys())}")
+                print(f"DEBUG: Response data: {data}")
+                
                 items = data.get("items", [])
                 if not items:
-                    # No more items, break pagination loop
+                    print(f"DEBUG: No more items found, breaking pagination")
                     break
                 
                 all_flows.extend(items)
+                print(f"DEBUG: Retrieved {len(items)} flows, total so far: {len(all_flows)}")
                 
-                # Check if there's more data (offset-based pagination)
-                current_offset = data.get("offset")
-                if current_offset is None:
-                    # No offset in response means no more pages
+                # If we got fewer items than expected page size, we're likely at the end
+                if len(items) < page_size:
+                    print(f"DEBUG: Got {len(items)} items (less than page size {page_size}), assuming end of data")
                     break
                 
-                # Update offset for next request
-                offset = current_offset
+                # Check different pagination patterns
+                current_offset = data.get("offset")
+                if current_offset is not None:
+                    # Use the offset returned by the API
+                    offset = current_offset
+                    print(f"DEBUG: Using API-provided offset: {offset}")
+                else:
+                    # Increment offset by the number of items we got
+                    offset += len(items)
+                    print(f"DEBUG: Incrementing offset by items count: {offset}")
                 
-                print(f"DEBUG: Retrieved {len(items)} flows, total so far: {len(all_flows)}")
+                # Safety check to prevent infinite loops
+                if offset > 1000:  # Arbitrary large number
+                    print(f"DEBUG: Safety break at offset {offset}")
+                    break
         
         print(f"DEBUG: Retrieved total of {len(all_flows)} flows")
         return all_flows
