@@ -107,14 +107,14 @@ class KodosumyClient:
     async def get_available_flows(self) -> List[Dict[str, Any]]:
         cookies = await self._ensure_authenticated()
         all_flows = []
-        offset = 0
-        page_size = 10  # Default page size, we'll try to determine this
+        offset = None
+        page_size = 10  # Default page size
         
         async with httpx.AsyncClient() as client:
             while True:
                 # Request flows with offset for pagination
                 url = f"{self.base_url}/flow"
-                if offset > 0:
+                if offset is not None:
                     url += f"?offset={offset}"
                 
                 print(f"DEBUG: Requesting flows from URL: {url}")
@@ -142,20 +142,19 @@ class KodosumyClient:
                     print(f"DEBUG: Got {len(items)} items (less than page size {page_size}), assuming end of data")
                     break
                 
-                # Check different pagination patterns
+                # Get the next offset from the API response
                 current_offset = data.get("offset")
-                if current_offset is not None:
-                    # Use the offset returned by the API
-                    offset = current_offset
-                    print(f"DEBUG: Using API-provided offset: {offset}")
-                else:
-                    # Increment offset by the number of items we got
-                    offset += len(items)
-                    print(f"DEBUG: Incrementing offset by items count: {offset}")
+                if current_offset is None:
+                    print(f"DEBUG: No offset in response, assuming end of data")
+                    break
                 
-                # Safety check to prevent infinite loops
-                if offset > 1000:  # Arbitrary large number
-                    print(f"DEBUG: Safety break at offset {offset}")
+                # Set offset for next request
+                offset = current_offset
+                print(f"DEBUG: Using API-provided offset for next request: {offset}")
+                
+                # Safety check to prevent infinite loops (max 100 pages)
+                if len(all_flows) > 1000:
+                    print(f"DEBUG: Safety break at {len(all_flows)} flows")
                     break
         
         print(f"DEBUG: Retrieved total of {len(all_flows)} flows")
