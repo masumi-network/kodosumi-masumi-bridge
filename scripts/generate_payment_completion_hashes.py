@@ -155,8 +155,8 @@ async def main():
         print(f"   Output preview: {job_output[:100]}...")
         print()
     
-    # Save to JSON file
-    output_file = "/Users/patricktobler/masumi_kodosuni_connector/payment_completion_data.json"
+    # Save to JSON file (use current directory)
+    output_file = "/tmp/payment_completion_data.json"
     with open(output_file, 'w') as f:
         json.dump(completion_data, f, indent=2, default=str)
     
