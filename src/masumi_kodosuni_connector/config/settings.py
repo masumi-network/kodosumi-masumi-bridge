@@ -40,17 +40,6 @@ class Settings(BaseSettings):
         env_key = f"AGENT_IDENTIFIER_{flow_key}"
         return os.getenv(env_key)
     
-    def get_agent_vkey(self, flow_key: str) -> str:
-        """Get the seller vKey for a specific agent. Falls back to global vKey if not specified."""
-        env_key = f"AGENT_VKEY_{flow_key}"
-        agent_vkey = os.getenv(env_key)
-        
-        if agent_vkey:
-            return agent_vkey
-        
-        # Fall back to global vKey
-        return self.seller_vkey
-    
     def get_configured_agents(self) -> Dict[str, str]:
         """Get all configured agent identifiers."""
         configured_agents = {}
@@ -62,18 +51,6 @@ class Settings(BaseSettings):
                 configured_agents[flow_key] = value
         
         return configured_agents
-    
-    def get_configured_agent_vkeys(self) -> Dict[str, str]:
-        """Get all configured agent-specific vKeys."""
-        configured_vkeys = {}
-        prefix = "AGENT_VKEY_"
-        
-        for key, value in os.environ.items():
-            if key.startswith(prefix):
-                flow_key = key[len(prefix):]
-                configured_vkeys[flow_key] = value
-        
-        return configured_vkeys
     
     def is_agent_enabled(self, flow_key: str) -> bool:
         """Check if an agent is enabled (has an identifier configured)."""

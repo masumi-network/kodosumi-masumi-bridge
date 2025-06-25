@@ -29,7 +29,7 @@ class MasumiClient:
         self.network = "Preprod" if network_lower == "preprod" else "Mainnet" if network_lower == "mainnet" else "Preprod"
         self.flow_key = flow_key
         self.agent_identifier = settings.get_agent_identifier(flow_key)
-        self.seller_vkey = settings.get_agent_vkey(flow_key)
+        self.seller_vkey = settings.seller_vkey
         self.payment_amount = int(settings.payment_amount)  # Convert to int as expected by Amount class
         self.payment_unit = settings.payment_unit
         
