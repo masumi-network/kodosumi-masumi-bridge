@@ -152,21 +152,46 @@ class MasumiClient:
             logger.error(f"Error checking payment status for job {job_id}: {str(e)}")
             raise
     
-    async def complete_payment(self, job_id: str, blockchain_identifier: str, result: Dict[str, Any]) -> None:
+    async def complete_payment(self, job_id: str, blockchain_identifier: str, result_data: Dict[str, Any], identifier_from_purchaser: str) -> None:
         """Complete the payment after successful job execution."""
         if self.test_mode:
             logger.info(f"Simulating payment completion for job {job_id}, blockchain_identifier {blockchain_identifier}")
             return
         
-        if job_id not in self.payment_instances:
-            raise ValueError(f"No payment instance found for job {job_id}")
-        
-        payment = self.payment_instances[job_id]
         logger.info(f"Completing payment {blockchain_identifier} for job {job_id}")
+        logger.info(f"Identifier from purchaser: {identifier_from_purchaser}")
+        
+        # Extract actual job output from result_data
+        job_output = result_data
+        if isinstance(result_data, dict) and "output" in result_data:
+            job_output = result_data["output"]
+        
+        logger.info(f"Job output for payment completion: {str(job_output)[:200]}...")
         
         try:
-            await payment.complete_payment(blockchain_identifier, result)
-            logger.info(f"Payment {blockchain_identifier} completed for job {job_id}")
+            # Create a new payment instance for completion (since we might not have the original)
+            if not self.test_mode:
+                from masumi.config import Config
+                from masumi.payment import Payment
+                
+                config = Config(
+                    payment_service_url=settings.payment_service_url,
+                    payment_api_key=settings.payment_api_key
+                )
+                
+                # Create a new payment instance just for completion
+                payment = Payment(
+                    agent_identifier=self.agent_identifier,
+                    config=config,
+                    identifier_from_purchaser=identifier_from_purchaser,
+                    input_data={},  # Not needed for completion
+                    network=self.network
+                )
+                
+                # Complete the payment with the masumi package
+                await payment.complete_payment(blockchain_identifier, job_output)
+                logger.info(f"Payment {blockchain_identifier} completed successfully for job {job_id}")
+                
         except Exception as e:
             logger.error(f"Error completing payment {blockchain_identifier} for job {job_id}: {str(e)}")
             raise

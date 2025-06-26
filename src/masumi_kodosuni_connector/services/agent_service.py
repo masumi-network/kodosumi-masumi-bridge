@@ -185,19 +185,33 @@ class FlowService:
                         flow_key = flow_run.flow_path.strip('/').replace('/', '_').replace('-', '_')
                         try:
                             masumi_client = MasumiClient(flow_key)
-                            # Extract blockchain identifier from payment response
+                            # Extract blockchain identifier and purchaser identifier from payment response
                             blockchain_identifier = None
+                            identifier_from_purchaser = None
+                            
                             if hasattr(flow_run, 'payment_response') and flow_run.payment_response:
-                                blockchain_identifier = flow_run.payment_response.get('data', {}).get('blockchainIdentifier')
+                                payment_data = flow_run.payment_response.get('data', {})
+                                blockchain_identifier = payment_data.get('blockchainIdentifier')
+                                identifier_from_purchaser = payment_data.get('identifierFromPurchaser')
                             
                             if not blockchain_identifier:
                                 # Fallback: use masumi_payment_id as blockchain_identifier
                                 blockchain_identifier = flow_run.masumi_payment_id
                             
+                            if not identifier_from_purchaser:
+                                logger.error(f"Missing identifier_from_purchaser for job {flow_run.id}")
+                                # Try to extract from original request or use a fallback
+                                identifier_from_purchaser = f"fallback_{flow_run.id}"
+                            
+                            logger.info(f"Completing payment for job {flow_run.id}")
+                            logger.info(f"Blockchain ID: {blockchain_identifier}")
+                            logger.info(f"Purchaser ID: {identifier_from_purchaser}")
+                            
                             await masumi_client.complete_payment(
                                 flow_run.id, 
                                 blockchain_identifier, 
-                                result_data
+                                result_data,
+                                identifier_from_purchaser
                             )
                             # Stop payment monitoring
                             masumi_client.stop_payment_monitoring(flow_run.id)
