@@ -6,6 +6,7 @@ from masumi_kodosuni_connector.models.agent_run import FlowRunStatus
 
 class FlowRunRequest(BaseModel):
     inputs: Dict[str, Any]
+    identifier_from_purchaser: str
     payment_amount: Optional[float] = None
 
 
@@ -33,7 +34,7 @@ class FlowInfo(BaseModel):
     name: str
     description: str
     version: str
-    author: str
+    author: Optional[str] = None
     tags: List[str]
 
 

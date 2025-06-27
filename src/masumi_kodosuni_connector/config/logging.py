@@ -1,5 +1,6 @@
 import structlog
 import logging
+import os
 from masumi_kodosuni_connector.config.settings import settings
 
 
@@ -8,6 +9,24 @@ def configure_logging():
         level=logging.DEBUG if settings.debug else logging.INFO,
         format="%(message)s"
     )
+    
+    # Create flow submission logger with separate file handler
+    flow_logger = logging.getLogger("flow_submission")
+    flow_logger.setLevel(logging.DEBUG)
+    
+    # Create file handler for flow submissions
+    flow_log_file = "flow_submissions.log"
+    flow_handler = logging.FileHandler(flow_log_file)
+    flow_handler.setLevel(logging.DEBUG)
+    
+    # Create formatter for flow logs
+    flow_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    flow_handler.setFormatter(flow_formatter)
+    
+    # Add handler to flow logger
+    flow_logger.addHandler(flow_handler)
     
     structlog.configure(
         processors=[

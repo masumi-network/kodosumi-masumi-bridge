@@ -34,7 +34,10 @@
       "Bash(grep:*)",
       "Bash(sed:*)",
       "Bash(pip index:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "Bash(./start.sh:*)",
+      "Bash(nslookup:*)",
+      "Bash(env)"
     ],
     "deny": []
   }

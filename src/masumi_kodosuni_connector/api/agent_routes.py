@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Path
+import logging
+import json
 from sqlalchemy.ext.asyncio import AsyncSession
 from masumi_kodosuni_connector.database.connection import get_db
 from masumi_kodosuni_connector.services.agent_service import FlowService
@@ -7,6 +9,9 @@ from masumi_kodosuni_connector.api.schemas import (
     FlowRunRequest, FlowRunResponse, FlowRunStatusResponse,
     FlowInfo, FlowListResponse, FlowSchemaResponse
 )
+
+# Get the dedicated flow submission logger
+flow_logger = logging.getLogger("flow_submission")
 
 
 def create_flow_router(flow_key: str, flow_info: dict) -> APIRouter:
@@ -17,22 +22,31 @@ def create_flow_router(flow_key: str, flow_info: dict) -> APIRouter:
         run_request: FlowRunRequest,
         db: AsyncSession = Depends(get_db)
     ):
+        flow_logger.info(f"=== API ENDPOINT: CREATE FLOW RUN ===")
+        flow_logger.info(f"Flow Key: {flow_key}")
+        flow_logger.info(f"Request: {json.dumps(run_request.dict(), indent=2)}")
+        
         service = FlowService(db)
         try:
             flow_run = await service.create_flow_run(
                 flow_key=flow_key,
                 inputs=run_request.inputs,
+                identifier_from_purchaser=run_request.identifier_from_purchaser,
                 payment_amount=run_request.payment_amount
             )
-            return FlowRunResponse(
+            response = FlowRunResponse(
                 id=flow_run.id,
                 status=flow_run.status,
                 payment_id=flow_run.masumi_payment_id,
                 created_at=flow_run.created_at
             )
+            flow_logger.info(f"API Response: {response.dict()}")
+            return response
         except ValueError as e:
+            flow_logger.error(f"API ValueError: {str(e)}")
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
+            flow_logger.error(f"API Exception: {str(e)}")
             raise HTTPException(status_code=500, detail="Internal server error")
     
     @router.get("/runs/{run_id}", response_model=FlowRunStatusResponse)
