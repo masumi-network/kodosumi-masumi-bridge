@@ -15,7 +15,17 @@ def configure_logging():
     flow_logger.setLevel(logging.DEBUG)
     
     # Create file handler for flow submissions
-    flow_log_file = "flow_submissions.log"
+    # Use absolute path to ensure log file is created in project root
+    import os
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+    flow_log_file = os.path.join(project_root, "flow_submissions.log")
+    
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(flow_log_file), exist_ok=True)
+    
+    # Print log file location for debugging
+    print(f"Flow submissions will be logged to: {flow_log_file}")
+    
     flow_handler = logging.FileHandler(flow_log_file)
     flow_handler.setLevel(logging.DEBUG)
     
