@@ -35,6 +35,23 @@ class MasumiClient:
         if not self.agent_identifier:
             raise ValueError(f"No agent identifier configured for flow: {flow_key}")
         
+        self._initialize_masumi()
+    
+    @classmethod
+    def with_agent_identifier(cls, agent_identifier: str):
+        """Create MasumiClient directly with agent identifier (for completion)"""
+        instance = cls.__new__(cls)  # Create instance without calling __init__
+        instance.test_mode = settings.masumi_test_mode
+        network_lower = settings.network.lower()
+        instance.network = "Preprod" if network_lower == "preprod" else "Mainnet" if network_lower == "mainnet" else "Preprod"
+        instance.flow_key = None  # Not needed for completion
+        instance.agent_identifier = agent_identifier
+        instance.seller_vkey = settings.seller_vkey
+        instance._initialize_masumi()
+        return instance
+    
+    def _initialize_masumi(self):
+        """Initialize masumi configuration"""
         if not self.test_mode:
             print(f"DEBUG: Configuring masumi with full API key: '{settings.payment_api_key}'")
             print(f"DEBUG: API key length: {len(settings.payment_api_key)}")

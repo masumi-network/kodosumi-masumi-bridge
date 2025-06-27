@@ -78,9 +78,14 @@ class FlowService:
             flow_logger.info(f"Updated flow run with payment ID: {masumi_payment_id}")
             
             # Store payment response data in flow run for MIP-003 response
-            await self.repository.update_payment_response(flow_run.id, payment_response)
-            flow_run.payment_response = payment_response  # Also set in memory for immediate use
-            flow_logger.info(f"Stored payment response in database")
+            # Also store the agent identifier for later use in completion
+            payment_response_with_agent = payment_response.copy()
+            payment_response_with_agent['agent_identifier'] = masumi_client.agent_identifier
+            payment_response_with_agent['flow_key'] = flow_key
+            
+            await self.repository.update_payment_response(flow_run.id, payment_response_with_agent)
+            flow_run.payment_response = payment_response_with_agent  # Also set in memory for immediate use
+            flow_logger.info(f"Stored payment response with agent identifier in database")
             
             # Start payment monitoring
             flow_logger.info(f"Starting payment monitoring for flow run {flow_run.id}")
@@ -230,25 +235,36 @@ class FlowService:
                     flow_logger.info(f"Masumi payment ID: {flow_run.masumi_payment_id}")
                     
                     try:
-                        # Determine flow_key from flow_path
-                        flow_key = flow_run.flow_path.strip('/').replace('/', '_').replace('-', '_')
-                        flow_logger.info(f"Derived flow_key for Masumi client: {flow_key}")
+                        # Extract agent identifier and flow_key from stored payment response
+                        agent_identifier = None
+                        saved_flow_key = None
+                        blockchain_identifier = None
+                        identifier_from_purchaser = None
+                        
+                        if hasattr(flow_run, 'payment_response') and flow_run.payment_response:
+                            payment_data = flow_run.payment_response.get('data', {})
+                            blockchain_identifier = payment_data.get('blockchainIdentifier')
+                            identifier_from_purchaser = payment_data.get('identifierFromPurchaser')
+                            agent_identifier = flow_run.payment_response.get('agent_identifier')
+                            saved_flow_key = flow_run.payment_response.get('flow_key')
+                            
+                            flow_logger.info(f"Retrieved from stored payment_response:")
+                            flow_logger.info(f"  - blockchain_identifier: {blockchain_identifier}")
+                            flow_logger.info(f"  - identifier_from_purchaser: {identifier_from_purchaser}")
+                            flow_logger.info(f"  - agent_identifier: {agent_identifier}")
+                            flow_logger.info(f"  - saved_flow_key: {saved_flow_key}")
+                        else:
+                            flow_logger.warning(f"No payment_response found in flow_run")
+                        
+                        if not agent_identifier:
+                            flow_logger.error(f"No agent_identifier found in payment_response for job {flow_run.id}")
+                            flow_logger.error(f"Cannot complete Masumi submission without agent identifier")
+                            raise ValueError(f"Missing agent_identifier in payment_response")
                         
                         try:
-                            masumi_client = MasumiClient(flow_key)
-                            flow_logger.info(f"MasumiClient created successfully")
-                            
-                            # Extract blockchain identifier and purchaser identifier from payment response
-                            blockchain_identifier = None
-                            identifier_from_purchaser = None
-                            
-                            if hasattr(flow_run, 'payment_response') and flow_run.payment_response:
-                                payment_data = flow_run.payment_response.get('data', {})
-                                blockchain_identifier = payment_data.get('blockchainIdentifier')
-                                identifier_from_purchaser = payment_data.get('identifierFromPurchaser')
-                                flow_logger.info(f"Extracted from payment_response - blockchain_id: {blockchain_identifier}, purchaser_id: {identifier_from_purchaser}")
-                            else:
-                                flow_logger.warning(f"No payment_response found in flow_run")
+                            # Create MasumiClient with the saved agent identifier directly
+                            masumi_client = MasumiClient.with_agent_identifier(agent_identifier)
+                            flow_logger.info(f"MasumiClient created with saved agent_identifier: {agent_identifier}")
                             
                             if not blockchain_identifier:
                                 # Fallback: use masumi_payment_id as blockchain_identifier
@@ -286,7 +302,7 @@ class FlowService:
                         except ValueError as e:
                             # Agent not configured for payment, skip completion
                             flow_logger.warning(f"=== MASUMI SUBMISSION SKIPPED ===")
-                            flow_logger.warning(f"No agent configured for flow {flow_key}: {str(e)}")
+                            flow_logger.warning(f"Cannot create MasumiClient: {str(e)}")
                             flow_logger.warning(f"Skipping payment completion for job {flow_run.id}")
                             
                     except Exception as e:
