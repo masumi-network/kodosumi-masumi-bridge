@@ -225,11 +225,19 @@ class FlowService:
                 
                 # Complete the payment with Masumi
                 if flow_run.masumi_payment_id:
+                    flow_logger.info(f"=== MASUMI SUBMISSION STARTING ===")
+                    flow_logger.info(f"Flow run ID: {flow_run.id}")
+                    flow_logger.info(f"Masumi payment ID: {flow_run.masumi_payment_id}")
+                    
                     try:
                         # Determine flow_key from flow_path
                         flow_key = flow_run.flow_path.strip('/').replace('/', '_').replace('-', '_')
+                        flow_logger.info(f"Derived flow_key for Masumi client: {flow_key}")
+                        
                         try:
                             masumi_client = MasumiClient(flow_key)
+                            flow_logger.info(f"MasumiClient created successfully")
+                            
                             # Extract blockchain identifier and purchaser identifier from payment response
                             blockchain_identifier = None
                             identifier_from_purchaser = None
@@ -238,19 +246,28 @@ class FlowService:
                                 payment_data = flow_run.payment_response.get('data', {})
                                 blockchain_identifier = payment_data.get('blockchainIdentifier')
                                 identifier_from_purchaser = payment_data.get('identifierFromPurchaser')
+                                flow_logger.info(f"Extracted from payment_response - blockchain_id: {blockchain_identifier}, purchaser_id: {identifier_from_purchaser}")
+                            else:
+                                flow_logger.warning(f"No payment_response found in flow_run")
                             
                             if not blockchain_identifier:
                                 # Fallback: use masumi_payment_id as blockchain_identifier
                                 blockchain_identifier = flow_run.masumi_payment_id
+                                flow_logger.info(f"Using fallback blockchain_identifier: {blockchain_identifier}")
                             
                             if not identifier_from_purchaser:
-                                logger.error(f"Missing identifier_from_purchaser for job {flow_run.id}")
+                                flow_logger.error(f"Missing identifier_from_purchaser for job {flow_run.id}")
                                 # Try to extract from original request or use a fallback
                                 identifier_from_purchaser = f"fallback_{flow_run.id}"
+                                flow_logger.info(f"Using fallback identifier_from_purchaser: {identifier_from_purchaser}")
                             
-                            logger.info(f"Completing payment for job {flow_run.id}")
-                            logger.info(f"Blockchain ID: {blockchain_identifier}")
-                            logger.info(f"Purchaser ID: {identifier_from_purchaser}")
+                            flow_logger.info(f"=== CALLING MASUMI COMPLETE_PAYMENT ===")
+                            flow_logger.info(f"Parameters:")
+                            flow_logger.info(f"  - job_id: {flow_run.id}")
+                            flow_logger.info(f"  - blockchain_identifier: {blockchain_identifier}")
+                            flow_logger.info(f"  - identifier_from_purchaser: {identifier_from_purchaser}")
+                            flow_logger.info(f"  - result_data type: {type(result_data)}")
+                            flow_logger.info(f"  - result_data keys: {list(result_data.keys()) if isinstance(result_data, dict) else 'Not a dict'}")
                             
                             await masumi_client.complete_payment(
                                 flow_run.id, 
@@ -258,16 +275,30 @@ class FlowService:
                                 result_data,
                                 identifier_from_purchaser
                             )
+                            
+                            flow_logger.info(f"=== MASUMI SUBMISSION SUCCESSFUL ===")
+                            flow_logger.info(f"Payment completion succeeded for job {flow_run.id}")
+                            
                             # Stop payment monitoring
                             masumi_client.stop_payment_monitoring(flow_run.id)
-                        except ValueError:
+                            flow_logger.info(f"Payment monitoring stopped for job {flow_run.id}")
+                            
+                        except ValueError as e:
                             # Agent not configured for payment, skip completion
-                            logger = __import__('structlog').get_logger()
-                            logger.info(f"No agent configured for flow {flow_key}, skipping payment completion")
+                            flow_logger.warning(f"=== MASUMI SUBMISSION SKIPPED ===")
+                            flow_logger.warning(f"No agent configured for flow {flow_key}: {str(e)}")
+                            flow_logger.warning(f"Skipping payment completion for job {flow_run.id}")
+                            
                     except Exception as e:
                         # Log error but don't fail the job completion
-                        logger = __import__('structlog').get_logger()
-                        logger.error(f"Failed to complete payment for job {flow_run.id}: {str(e)}")
+                        flow_logger.error(f"=== MASUMI SUBMISSION FAILED ===")
+                        flow_logger.error(f"Failed to complete payment for job {flow_run.id}")
+                        flow_logger.error(f"Error type: {type(e).__name__}")
+                        flow_logger.error(f"Error message: {str(e)}")
+                        flow_logger.error(f"Full error details: {repr(e)}")
+                else:
+                    flow_logger.warning(f"=== NO MASUMI PAYMENT ID ===")
+                    flow_logger.warning(f"No masumi_payment_id found for flow_run {flow_run.id}, skipping Masumi submission")
             elif kodosumi_status == KodosumyFlowStatus.ERROR:
                 # Try to get error details from events
                 events = await self.kodosumi_client.get_flow_events(flow_run.flow_path, flow_run.kodosumi_run_id)
