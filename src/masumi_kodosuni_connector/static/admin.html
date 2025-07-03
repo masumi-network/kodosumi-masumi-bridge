@@ -259,14 +259,14 @@
             }
             
             const rows = flows.map((flow, index) => {
-                const mipBaseUrl = flow.enabled ? `/mip003/${flow.key}` : null;
+                const mipBaseUrl = `/mip003/${flow.key}`;
                 
                 return `
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-4">
                             <div class="agent-name">${flow.name}</div>
                             <div class="agent-detail text-xs text-gray-500">${flow.key}</div>
-                            ${mipBaseUrl ? `<div class="text-xs text-blue-600 font-mono mt-1">${mipBaseUrl}</div>` : ''}
+                            <div class="text-xs font-mono mt-1 ${flow.enabled ? 'text-blue-600' : 'text-gray-400'}">${mipBaseUrl}${flow.enabled ? '' : ' (disabled)'}</div>
                         </td>
                         <td class="px-4 py-4">
                             <div class="text-sm ${flow.enabled && flow.agent_identifier ? 'text-gray-900 font-mono' : 'text-gray-400'}" title="${flow.enabled && flow.agent_identifier ? flow.agent_identifier : 'Not configured'}">
