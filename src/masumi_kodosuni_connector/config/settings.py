@@ -30,7 +30,8 @@ class Settings(BaseSettings):
     payment_service_url: str = Field(..., env="PAYMENT_SERVICE_URL")
     payment_api_key: str = Field(..., env="PAYMENT_API_KEY")
     network: str = Field(default="preprod", env="NETWORK")
-    # Note: payment amounts and seller keys are configured within the masumi package, not here
+    seller_vkey: str = Field(..., env="SELLER_VKEY")
+    # Note: payment amounts are configured within the masumi package, not here
     masumi_test_mode: bool = Field(default=False, env="MASUMI_TEST_MODE")
     
     host: str = Field(default="0.0.0.0", env="HOST")

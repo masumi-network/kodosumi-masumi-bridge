@@ -133,31 +133,58 @@ class AgentConfigService:
     
     async def sync_with_discovered_flows(self, discovered_flows: Dict[str, Dict]) -> None:
         """Sync agent configs with discovered flows, updating flow names and descriptions."""
+        if not discovered_flows:
+            return
+            
+        # Batch fetch all existing configs in one query
+        flow_keys = list(discovered_flows.keys())
+        result = await self.session.execute(
+            select(AgentConfig).where(AgentConfig.flow_key.in_(flow_keys))
+        )
+        existing_configs = {config.flow_key: config for config in result.scalars().all()}
+        
+        # Prepare updates and inserts
+        updates_to_make = []
+        new_configs_to_add = []
+        
         for flow_key, flow_info in discovered_flows.items():
-            existing_config = await self.get_agent_config(flow_key)
+            existing_config = existing_configs.get(flow_key)
+            flow_name = flow_info.get("name")
+            description = flow_info.get("description")
             
             if existing_config:
-                # Update flow name and description for existing configs
-                if (existing_config.flow_name != flow_info.get("name") or 
-                    existing_config.description != flow_info.get("description")):
-                    
-                    await self.session.execute(
-                        update(AgentConfig)
-                        .where(AgentConfig.flow_key == flow_key)
-                        .values(
-                            flow_name=flow_info.get("name"),
-                            description=flow_info.get("description")
-                        )
-                    )
+                # Check if update is needed
+                if (existing_config.flow_name != flow_name or 
+                    existing_config.description != description):
+                    updates_to_make.append({
+                        'flow_key': flow_key,
+                        'flow_name': flow_name,
+                        'description': description
+                    })
             else:
                 # Create new disabled config for newly discovered flows
-                new_config = AgentConfig(
+                new_configs_to_add.append(AgentConfig(
                     flow_key=flow_key,
                     enabled=False,
-                    flow_name=flow_info.get("name"),
-                    description=flow_info.get("description")
+                    flow_name=flow_name,
+                    description=description
+                ))
+        
+        # Perform bulk updates
+        if updates_to_make:
+            for update_data in updates_to_make:
+                await self.session.execute(
+                    update(AgentConfig)
+                    .where(AgentConfig.flow_key == update_data['flow_key'])
+                    .values(
+                        flow_name=update_data['flow_name'],
+                        description=update_data['description']
+                    )
                 )
-                self.session.add(new_config)
+        
+        # Perform bulk inserts
+        if new_configs_to_add:
+            self.session.add_all(new_configs_to_add)
         
         await self.session.commit()
-        logger.info(f"Synced agent configs with {len(discovered_flows)} discovered flows")
+        logger.info(f"Synced agent configs with {len(discovered_flows)} discovered flows - {len(updates_to_make)} updates, {len(new_configs_to_add)} new configs")

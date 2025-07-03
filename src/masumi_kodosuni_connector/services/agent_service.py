@@ -1,5 +1,6 @@
 from typing import Dict, Any, Optional
 import json
+import time
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from masumi_kodosuni_connector.clients.kodosumi_client import KodosumyClient, KodosumyFlowStatus, interpret_kodosumi_status
@@ -8,9 +9,46 @@ from masumi_kodosuni_connector.database.repositories import FlowRunRepository
 from masumi_kodosuni_connector.models.agent_run import FlowRun, FlowRunStatus
 from masumi_kodosuni_connector.services.flow_discovery_service import flow_discovery
 from masumi_kodosuni_connector.config.logging import get_logger
+from masumi_kodosuni_connector.config.settings import settings
 
 # Get the dedicated flow submission logger
 flow_logger = get_logger("flow_submission")
+
+
+def cardano_slot_to_unix_timestamp(slot_number: int, network: str = "preprod") -> int:
+    """Convert Cardano slot number to Unix timestamp.
+    
+    Args:
+        slot_number: Cardano slot number
+        network: Network type ("mainnet" or "preprod")
+        
+    Returns:
+        Unix timestamp (seconds since 1970-01-01 00:00:00 UTC)
+    """
+    # First check if this looks like a timestamp in milliseconds
+    # Unix timestamp in milliseconds would be around 1.7 trillion for current time
+    current_time_ms = int(time.time() * 1000)
+    if slot_number > current_time_ms / 2 and slot_number < current_time_ms * 10:
+        # This looks like a timestamp in milliseconds, convert to seconds
+        return slot_number // 1000
+    
+    # Check if this is already a Unix timestamp in seconds
+    current_time_s = int(time.time())
+    if slot_number > current_time_s / 2 and slot_number < current_time_s * 10:
+        # This is already a Unix timestamp in seconds
+        return slot_number
+    
+    # Otherwise, treat as a Cardano slot number
+    if network.lower() == "mainnet":
+        # Cardano mainnet genesis: 2017-09-23 21:44:51 UTC (slot 0)
+        genesis_time = 1506203091
+        slot_length = 1
+    else:  # preprod or any other network defaults to preprod
+        # Cardano preprod genesis: 2022-06-01 00:00:00 UTC (slot 0)
+        genesis_time = 1654041600
+        slot_length = 1
+    
+    return genesis_time + (slot_number * slot_length)
 
 
 class FlowService:
@@ -92,6 +130,14 @@ class FlowService:
             submit_result_time = payment_response["data"]["submitResultTime"]
             if isinstance(submit_result_time, str):
                 submit_result_time = int(submit_result_time)
+            
+            # Convert Cardano slot to Unix timestamp if needed
+            # Check if this looks like a slot number (very large number compared to current time)
+            current_time = datetime.utcnow().timestamp()
+            if submit_result_time > current_time * 10:  # If more than 10x current time, likely a slot number
+                submit_result_time = cardano_slot_to_unix_timestamp(submit_result_time, settings.network)
+                flow_logger.info(f"Converted Cardano slot to Unix timestamp: {submit_result_time}")
+            
             timeout_at = datetime.utcfromtimestamp(submit_result_time)
             await self.repository.update_timeout(flow_run.id, timeout_at)
             flow_logger.info(f"Set job timeout to {timeout_at.isoformat()} based on submitResultTime")

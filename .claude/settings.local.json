@@ -44,7 +44,9 @@
       "Bash(docker:*)",
       "Bash(alembic upgrade:*)",
       "Bash(./venv/bin/python:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "WebFetch(domain:pypi.org)",
+      "Bash(ss:*)"
     ],
     "deny": []
   }
