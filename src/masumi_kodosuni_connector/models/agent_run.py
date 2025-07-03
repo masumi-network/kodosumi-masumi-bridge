@@ -16,6 +16,7 @@ class FlowRunStatus(str, Enum):
     FINISHED = "finished"
     ERROR = "error"
     CANCELLED = "cancelled"
+    TIMEOUT = "timeout"
 
 
 class FlowRun(Base):
@@ -44,3 +45,4 @@ class FlowRun(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     started_at = Column(DateTime)
     completed_at = Column(DateTime)
+    timeout_at = Column(DateTime)  # When job should timeout (from submitResultTime)

@@ -5,6 +5,7 @@ import hashlib
 import structlog
 from typing import Dict, Any, Optional
 from masumi_kodosuni_connector.config.settings import settings
+from masumi_kodosuni_connector.config.logging import get_logger
 
 # Only import masumi if not in test mode
 if not settings.masumi_test_mode:
@@ -30,10 +31,19 @@ class MasumiClient:
         self.flow_key = flow_key
         self.agent_identifier = settings.get_agent_identifier(flow_key)
         self.seller_vkey = settings.seller_vkey
+        self.logger = get_logger("payment")
+        
         # Note: payment amounts are handled by the masumi package, not configured here
         
         if not self.agent_identifier:
+            self.logger.error("No agent identifier configured", flow_key=flow_key)
             raise ValueError(f"No agent identifier configured for flow: {flow_key}")
+        
+        self.logger.info("Initializing MasumiClient", 
+                        flow_key=flow_key,
+                        agent_identifier=self.agent_identifier,
+                        network=self.network,
+                        test_mode=self.test_mode)
         
         self._initialize_masumi()
     
@@ -53,18 +63,20 @@ class MasumiClient:
     def _initialize_masumi(self):
         """Initialize masumi configuration"""
         if not self.test_mode:
-            print(f"DEBUG: Configuring masumi with full API key: '{settings.payment_api_key}'")
-            print(f"DEBUG: API key length: {len(settings.payment_api_key)}")
-            print(f"DEBUG: Payment service URL: {settings.payment_service_url}")
-            print(f"DEBUG: Network: {self.network}")
+            self.logger.info("Configuring Masumi payment service", 
+                           payment_service_url=settings.payment_service_url,
+                           api_key_length=len(settings.payment_api_key),
+                           network=self.network)
+            
             self.config = Config(
                 payment_service_url=settings.payment_service_url,
                 payment_api_key=settings.payment_api_key
             )
             # Store active payment instances for monitoring
             self.payment_instances: Dict[str, Payment] = {}
+            self.logger.debug("Masumi configuration completed")
         else:
-            logger.info("Masumi client running in test mode - payments will be simulated")
+            self.logger.info("Masumi client running in test mode - payments will be simulated")
     
     async def create_payment_request(
         self, 
@@ -111,7 +123,7 @@ class MasumiClient:
             
             # Add the input_hash from the payment instance to the response
             payment_request["input_hash"] = payment.input_hash
-            print(f"DEBUG: Added input_hash to payment_request: {payment.input_hash}")
+            self.logger.debug("Added input_hash to payment_request", input_hash=payment.input_hash)
             
             return payment_request
             

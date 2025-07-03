@@ -5,8 +5,19 @@ from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
-load_dotenv("/Users/patricktobler/masumi_kodosuni_connector/.env")
-load_dotenv(".env")  # Also try from current directory
+# Try multiple paths to find .env file
+import pathlib
+project_root = pathlib.Path(__file__).parent.parent.parent.parent
+env_paths = [
+    project_root / ".env",
+    pathlib.Path.cwd() / ".env",
+    pathlib.Path(".env")
+]
+
+for env_path in env_paths:
+    if env_path.exists():
+        load_dotenv(env_path)
+        break
 
 class Settings(BaseSettings):
     database_url: str = Field(..., env="DATABASE_URL")
@@ -29,31 +40,31 @@ class Settings(BaseSettings):
     
     polling_interval_seconds: int = Field(default=30, env="POLLING_INTERVAL_SECONDS")
     
+    # API Security
+    api_key: Optional[str] = Field(default=None, env="API_KEY")
+    
     class Config:
-        env_file = [".env", "/Users/patricktobler/masumi_kodosuni_connector/.env"]
+        env_file = [str(p) for p in env_paths if p.exists()]
         case_sensitive = False
         extra = "ignore"  # Allow extra environment variables
     
     def get_agent_identifier(self, flow_key: str) -> Optional[str]:
         """Get the agent identifier for a specific flow."""
-        env_key = f"AGENT_IDENTIFIER_{flow_key}"
-        return os.getenv(env_key)
+        # Import here to avoid circular imports
+        from masumi_kodosuni_connector.services.agent_config_manager import agent_config_manager
+        return agent_config_manager.get_agent_identifier(flow_key)
     
     def get_configured_agents(self) -> Dict[str, str]:
         """Get all configured agent identifiers."""
-        configured_agents = {}
-        prefix = "AGENT_IDENTIFIER_"
-        
-        for key, value in os.environ.items():
-            if key.startswith(prefix):
-                flow_key = key[len(prefix):]
-                configured_agents[flow_key] = value
-        
-        return configured_agents
+        # Import here to avoid circular imports
+        from masumi_kodosuni_connector.services.agent_config_manager import agent_config_manager
+        return agent_config_manager.get_configured_agents()
     
     def is_agent_enabled(self, flow_key: str) -> bool:
         """Check if an agent is enabled (has an identifier configured)."""
-        return self.get_agent_identifier(flow_key) is not None
+        # Import here to avoid circular imports
+        from masumi_kodosuni_connector.services.agent_config_manager import agent_config_manager
+        return agent_config_manager.is_agent_enabled(flow_key)
 
 
 settings = Settings()

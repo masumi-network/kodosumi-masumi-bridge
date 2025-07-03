@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine
@@ -22,19 +20,10 @@ services:
     build: .
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=postgresql+asyncpg://masumi_user:${POSTGRES_PASSWORD:-Hj8nK4qW7rT3xZ9mV2cF6bN0pL5uY1eR}@postgres:5432/masumi_connector
-      - KODOSUMI_BASE_URL=${KODOSUMI_BASE_URL}
-      - KODOSUMI_USERNAME=${KODOSUMI_USERNAME}
-      - KODOSUMI_PASSWORD=${KODOSUMI_PASSWORD}
-      - PAYMENT_SERVICE_URL=${PAYMENT_SERVICE_URL}
-      - PAYMENT_API_KEY=${PAYMENT_API_KEY}
-      - NETWORK=${NETWORK}
-      - SELLER_VKEY=${SELLER_VKEY}
-      - PAYMENT_AMOUNT=${PAYMENT_AMOUNT}
-      - PAYMENT_UNIT=${PAYMENT_UNIT}
-      - MASUMI_TEST_MODE=${MASUMI_TEST_MODE}
-      - POLLING_INTERVAL_SECONDS=${POLLING_INTERVAL_SECONDS}
     volumes:
       - ./.env:/app/.env
     restart: unless-stopped

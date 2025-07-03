@@ -1,15 +1,16 @@
 from typing import Dict, Any, Optional
-import logging
 import json
+from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from masumi_kodosuni_connector.clients.kodosumi_client import KodosumyClient, KodosumyFlowStatus, interpret_kodosumi_status
 from masumi_kodosuni_connector.clients.masumi_client import MasumiClient
 from masumi_kodosuni_connector.database.repositories import FlowRunRepository
 from masumi_kodosuni_connector.models.agent_run import FlowRun, FlowRunStatus
 from masumi_kodosuni_connector.services.flow_discovery_service import flow_discovery
+from masumi_kodosuni_connector.config.logging import get_logger
 
 # Get the dedicated flow submission logger
-flow_logger = logging.getLogger("flow_submission")
+flow_logger = get_logger("flow_submission")
 
 
 class FlowService:
@@ -86,6 +87,14 @@ class FlowService:
             await self.repository.update_payment_response(flow_run.id, payment_response_with_agent)
             flow_run.payment_response = payment_response_with_agent  # Also set in memory for immediate use
             flow_logger.info(f"Stored payment response with agent identifier in database")
+            
+            # Store submitResultTime as timeout_at for job timeout handling
+            submit_result_time = payment_response["data"]["submitResultTime"]
+            if isinstance(submit_result_time, str):
+                submit_result_time = int(submit_result_time)
+            timeout_at = datetime.utcfromtimestamp(submit_result_time)
+            await self.repository.update_timeout(flow_run.id, timeout_at)
+            flow_logger.info(f"Set job timeout to {timeout_at.isoformat()} based on submitResultTime")
             
             # Start payment monitoring
             flow_logger.info(f"Starting payment monitoring for flow run {flow_run.id}")
@@ -334,3 +343,19 @@ class FlowService:
             import traceback
             print(f"DEBUG: Full traceback: {traceback.format_exc()}")
             await self.repository.update_error(flow_run.id, f"Failed to update from Kodosumi: {str(e)}")
+    
+    async def mark_job_as_timeout(self, flow_run_id: str):
+        """Mark a job as timed out and stop processing it."""
+        # Update status to TIMEOUT and set error message and completion time
+        from sqlalchemy import update
+        result = await self.repository.session.execute(
+            update(FlowRun)
+            .where(FlowRun.id == flow_run_id)
+            .values(
+                status=FlowRunStatus.TIMEOUT,
+                error_message="Job timed out based on submitResultTime",
+                completed_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+        )
+        await self.repository.session.commit()

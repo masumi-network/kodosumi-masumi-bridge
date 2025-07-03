@@ -3,334 +3,524 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Masumi Kodosumi Connector - Admin Panel</title>
+    <title>Masumi Kodosuni Connector</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
         * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
         
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f8f9fa;
+        .checkbox {
+            width: 18px;
+            height: 18px;
+            accent-color: #2563eb;
         }
         
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .header {
+        .table-container {
             background: white;
-            padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
         }
         
-        .header h1 {
-            color: #2c3e50;
-            margin-bottom: 5px;
+        .status-running {
+            color: #059669;
+            font-weight: 500;
         }
         
-        .header p {
-            color: #7f8c8d;
-            font-size: 14px;
-        }
-        
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-        
-        .card {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .card h2 {
-            color: #2c3e50;
-            margin-bottom: 15px;
-            font-size: 18px;
-        }
-        
-        .agent-list {
-            list-style: none;
-        }
-        
-        .agent-item {
-            display: flex;
-            justify-content: between;
-            align-items: center;
-            padding: 10px;
-            margin-bottom: 8px;
-            background: #f8f9fa;
-            border-radius: 4px;
-            border-left: 4px solid #e74c3c;
-        }
-        
-        .agent-item.enabled {
-            border-left-color: #27ae60;
-        }
-        
-        .agent-item.disabled {
-            border-left-color: #e74c3c;
-        }
-        
-        .agent-info {
-            flex: 1;
+        .status-xxx {
+            color: #6b7280;
+            font-weight: 500;
         }
         
         .agent-name {
-            font-weight: 600;
-            color: #2c3e50;
+            font-weight: 500;
+            color: #111827;
         }
         
-        .agent-key {
-            font-size: 12px;
-            color: #7f8c8d;
-            font-family: monospace;
-        }
-        
-        .agent-identifier {
-            font-size: 11px;
-            color: #8e44ad;
-            font-family: monospace;
-            margin-top: 2px;
-        }
-        
-        .status-badge {
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        
-        .status-enabled {
-            background: #d5f4e6;
-            color: #27ae60;
-        }
-        
-        .status-disabled {
-            background: #fdf2f2;
-            color: #e74c3c;
-        }
-        
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .stat {
-            text-align: center;
-            padding: 15px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .stat-number {
-            font-size: 24px;
-            font-weight: bold;
-            color: #2c3e50;
-        }
-        
-        .stat-label {
-            font-size: 12px;
-            color: #7f8c8d;
-            text-transform: uppercase;
-        }
-        
-        .refresh-btn {
-            background: #3498db;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            margin-bottom: 15px;
-        }
-        
-        .refresh-btn:hover {
-            background: #2980b9;
-        }
-        
-        .network-info {
-            background: #e8f4fd;
-            border: 1px solid #3498db;
-            border-radius: 4px;
-            padding: 10px;
-            margin-bottom: 15px;
-        }
-        
-        .network-info strong {
-            color: #2980b9;
-        }
-        
-        .loading {
-            display: none;
-            text-align: center;
-            color: #7f8c8d;
-            padding: 20px;
-        }
-        
-        @media (max-width: 768px) {
-            .grid {
-                grid-template-columns: 1fr;
-            }
+        .agent-detail {
+            color: #6b7280;
+            font-size: 0.875rem;
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Masumi Kodosumi Connector - Admin Panel</h1>
-            <p>Manage your AI agent configurations and monitor system status</p>
-        </div>
-        
-        <div class="stats" id="stats">
-            <div class="stat">
-                <div class="stat-number" id="total-agents">-</div>
-                <div class="stat-label">Total Agents</div>
-            </div>
-            <div class="stat">
-                <div class="stat-number" id="enabled-agents">-</div>
-                <div class="stat-label">Enabled Agents</div>
-            </div>
-            <div class="stat">
-                <div class="stat-number" id="network-status">-</div>
-                <div class="stat-label">Network</div>
-            </div>
-            <div class="stat">
-                <div class="stat-number" id="test-mode">-</div>
-                <div class="stat-label">Test Mode</div>
-            </div>
-        </div>
-        
-        <div class="grid">
-            <div class="card">
-                <h2>Available Agents</h2>
-                <button class="refresh-btn" onclick="loadAgents()">🔄 Refresh</button>
-                <div class="network-info">
-                    <strong>Network:</strong> <span id="current-network">Loading...</span><br>
-                    <strong>Test Mode:</strong> <span id="current-test-mode">Loading...</span>
+<body class="bg-gray-50 min-h-screen">
+    <div class="max-w-screen-2xl mx-auto p-6">
+        <!-- Header -->
+        <div class="mb-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-semibold text-gray-900">Kodosumi: <span class="text-lg font-normal text-gray-600" id="kodosumi-url">-</span></h1>
+                    <p class="text-gray-600 mt-1">Masumi Kodosuni Connector</p>
                 </div>
-                <div class="loading" id="loading">Loading agents...</div>
-                <ul class="agent-list" id="agent-list">
-                    <!-- Agents will be loaded here -->
-                </ul>
-            </div>
-            
-            <div class="card">
-                <h2>Configuration Guide</h2>
-                <p><strong>To enable an agent:</strong></p>
-                <ol style="margin: 10px 0; padding-left: 20px;">
-                    <li>Stop the server</li>
-                    <li>Add the agent identifier to your .env file:</li>
-                    <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; margin: 10px 0;">AGENT_IDENTIFIER_&lt;flow_key&gt;=&lt;your-agent-id&gt;</pre>
-                    <li>Restart the server</li>
-                </ol>
-                
-                <p><strong>Example:</strong></p>
-                <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; margin: 10px 0;">AGENT_IDENTIFIER_-_localhost_8001_seo-agent_-_=seo-analysis-masumi-agent</pre>
-                
-                <p><strong>Network Options:</strong></p>
-                <ul style="margin: 10px 0; padding-left: 20px;">
-                    <li><code>preprod</code> - Testnet for development</li>
-                    <li><code>mainnet</code> - Production network</li>
-                </ul>
-                
-                <p style="margin-top: 15px; font-size: 12px; color: #7f8c8d;">
-                    Note: Only agents with configured identifiers will be callable via the API.
-                </p>
+                <div class="flex gap-3">
+                    <button onclick="reloadRoutes()" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <i data-lucide="refresh-cw" class="w-4 h-4 mr-2"></i>
+                        Reload API Routes
+                    </button>
+                    <a href="/docs" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                        <i data-lucide="book-open" class="w-4 h-4 mr-2"></i>
+                        API Docs
+                    </a>
+                </div>
+                <!-- System Info -->
+                <div class="flex gap-6">
+                    <div class="text-center">
+                        <div class="text-xs text-gray-500 uppercase tracking-wider">Network</div>
+                        <div class="text-sm font-semibold text-gray-900" id="network-info">-</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-xs text-gray-500 uppercase tracking-wider">Test Mode</div>
+                        <div class="text-sm font-semibold text-gray-900" id="test-mode-info">-</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-xs text-gray-500 uppercase tracking-wider">Total Agents</div>
+                        <div class="text-sm font-semibold text-gray-900" id="total-agents-info">-</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-xs text-gray-500 uppercase tracking-wider">Enabled Agents</div>
+                        <div class="text-sm font-semibold text-gray-900" id="enabled-agents-info">-</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-xs text-gray-500 uppercase tracking-wider">Polling Interval</div>
+                        <div class="text-sm font-semibold text-gray-900" id="polling-interval-info">-</div>
+                    </div>
+                </div>
             </div>
         </div>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Agents Section -->
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Agents</h2>
+                <div class="table-container">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Agent
+                                    </th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Agent Identifier
+                                    </th>
+                                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                                        Actions
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="agents-table-body" class="bg-white divide-y divide-gray-200">
+                                <!-- Loading row -->
+                                <tr>
+                                    <td colspan="3" class="px-4 py-8 text-center text-gray-500">
+                                        <i data-lucide="loader" class="w-6 h-6 mx-auto mb-2 animate-spin"></i>
+                                        <div>Loading agents...</div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Running Jobs Section -->
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Running Jobs</h2>
+                <div class="table-container">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Job ID
+                                    </th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Agent
+                                    </th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Status
+                                    </th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Timeout
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="running-jobs-table-body" class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td colspan="4" class="px-4 py-8 text-center text-gray-500">
+                                        <i data-lucide="pause-circle" class="w-6 h-6 mx-auto mb-2"></i>
+                                        <div>No running jobs</div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
-    
+
     <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+        
         let allFlows = [];
-        let enabledFlows = [];
+        let runningJobs = [];
+        
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            await refreshData();
+            // Auto-refresh every 30 seconds
+            setInterval(refreshData, 30000);
+        });
+        
+        async function refreshData() {
+            await Promise.all([loadAgents(), loadRunningJobs()]);
+        }
         
         async function loadAgents() {
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('agent-list').innerHTML = '';
-            
             try {
-                // Load all flows from admin endpoint
-                const response = await fetch('/admin/flows');
+                // Get API key from URL params if present
+                const urlParams = new URLSearchParams(window.location.search);
+                const apiKey = urlParams.get('api_key');
+                
+                const headers = {};
+                if (apiKey) {
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                }
+                
+                const response = await fetch('/admin/flows', {
+                    headers: headers
+                });
                 const data = await response.json();
                 
                 allFlows = data.flows || [];
-                
-                // Get system info
-                updateStats(data);
-                updateNetworkInfo(data);
-                
-                // Display all agents (both enabled and disabled)
-                const agentList = document.getElementById('agent-list');
-                
-                if (allFlows.length === 0) {
-                    agentList.innerHTML = '<li style="color: #7f8c8d; padding: 20px; text-align: center;">No agents discovered from Kodosumi. Check your connection.</li>';
-                } else {
-                    allFlows.forEach(flow => {
-                        const listItem = document.createElement('li');
-                        listItem.className = `agent-item ${flow.enabled ? 'enabled' : 'disabled'}`;
-                        
-                        const agentIdentifierText = flow.enabled 
-                            ? `✓ ID: ${flow.agent_identifier || 'configured'}`
-                            : '✗ Not configured';
-                        
-                        listItem.innerHTML = `
-                            <div class="agent-info">
-                                <div class="agent-name">${flow.name || flow.key}</div>
-                                <div class="agent-key">${flow.key}</div>
-                                <div class="agent-identifier">${agentIdentifierText}</div>
-                            </div>
-                            <span class="status-badge ${flow.enabled ? 'status-enabled' : 'status-disabled'}">
-                                ${flow.enabled ? 'Enabled' : 'Disabled'}
-                            </span>
-                        `;
-                        agentList.appendChild(listItem);
-                    });
-                }
+                updateSystemInfo(data);
+                displayAgentsTable(allFlows);
                 
             } catch (error) {
                 console.error('Error loading agents:', error);
-                document.getElementById('agent-list').innerHTML = '<li style="color: #e74c3c; padding: 20px; text-align: center;">Error loading agents. Please check your connection.</li>';
-            } finally {
-                document.getElementById('loading').style.display = 'none';
+                showError('agents-table-body', 'Failed to load agents');
             }
         }
         
-        function updateStats(data) {
-            document.getElementById('total-agents').textContent = data.total_flows || 0;
-            document.getElementById('enabled-agents').textContent = data.enabled_flows || 0;
-            document.getElementById('network-status').textContent = data.network || 'Unknown';
-            document.getElementById('test-mode').textContent = data.test_mode ? 'On' : 'Off';
+        async function loadRunningJobs() {
+            try {
+                // Get API key from URL params if present
+                const urlParams = new URLSearchParams(window.location.search);
+                const apiKey = urlParams.get('api_key');
+                
+                const headers = {};
+                if (apiKey) {
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                }
+                
+                const response = await fetch('/admin/running-jobs', {
+                    headers: headers
+                });
+                const data = await response.json();
+                
+                runningJobs = data.running_jobs || [];
+                displayRunningJobsTable(runningJobs);
+                
+            } catch (error) {
+                console.error('Error loading running jobs:', error);
+                showError('running-jobs-table-body', 'Failed to load running jobs');
+            }
         }
         
-        function updateNetworkInfo(data) {
-            const networkText = data.network === 'preprod' ? 'preprod (testnet)' : data.network || 'Unknown';
-            document.getElementById('current-network').textContent = networkText;
-            document.getElementById('current-test-mode').textContent = data.test_mode ? 'Enabled' : 'Disabled';
+        function updateSystemInfo(data) {
+            document.getElementById('network-info').textContent = data.network || 'Unknown';
+            document.getElementById('test-mode-info').textContent = data.test_mode ? 'On' : 'Off';
+            document.getElementById('total-agents-info').textContent = data.total_flows || 0;
+            document.getElementById('enabled-agents-info').textContent = data.enabled_flows || 0;
+            document.getElementById('kodosumi-url').textContent = data.kodosumi_url || 'Not configured';
+            document.getElementById('polling-interval-info').textContent = `${data.polling_interval_seconds || 10}s`;
         }
         
-        // Load agents on page load
-        document.addEventListener('DOMContentLoaded', loadAgents);
+        function displayAgentsTable(flows) {
+            const tbody = document.getElementById('agents-table-body');
+            
+            if (flows.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="px-4 py-8 text-center text-gray-500">
+                            <i data-lucide="bot" class="w-6 h-6 mx-auto mb-2"></i>
+                            <div>No agents found</div>
+                        </td>
+                    </tr>
+                `;
+                lucide.createIcons();
+                return;
+            }
+            
+            const rows = flows.map((flow, index) => {
+                const mipBaseUrl = flow.enabled ? `/mip003/${flow.key}` : null;
+                
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-4">
+                            <div class="agent-name">${flow.name}</div>
+                            <div class="agent-detail text-xs text-gray-500">${flow.key}</div>
+                            ${mipBaseUrl ? `<div class="text-xs text-blue-600 font-mono mt-1">${mipBaseUrl}</div>` : ''}
+                        </td>
+                        <td class="px-4 py-4">
+                            <div class="text-sm ${flow.enabled && flow.agent_identifier ? 'text-gray-900 font-mono' : 'text-gray-400'}" title="${flow.enabled && flow.agent_identifier ? flow.agent_identifier : 'Not configured'}">
+                                ${flow.enabled && flow.agent_identifier ? 
+                                    (flow.agent_identifier.length > 20 ? 
+                                        flow.agent_identifier.substring(0, 20) + '...' : 
+                                        flow.agent_identifier
+                                    ) : 
+                                    'Not configured'
+                                }
+                            </div>
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap text-center">
+                            ${flow.enabled ? 
+                                `<button onclick="disableAgent('${flow.key}')" class="inline-flex items-center px-2 py-1 text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200">
+                                    Disable
+                                </button>` :
+                                `<button onclick="enableAgent('${flow.key}')" class="inline-flex items-center px-2 py-1 text-xs font-medium rounded text-green-700 bg-green-100 hover:bg-green-200">
+                                    Enable
+                                </button>`
+                            }
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            tbody.innerHTML = rows;
+            lucide.createIcons();
+        }
         
-        // Auto-refresh every 30 seconds
-        setInterval(loadAgents, 30000);
+        function displayRunningJobsTable(jobs) {
+            const tbody = document.getElementById('running-jobs-table-body');
+            
+            if (jobs.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-4 py-8 text-center text-gray-500">
+                            <i data-lucide="pause-circle" class="w-6 h-6 mx-auto mb-2"></i>
+                            <div>No running jobs</div>
+                        </td>
+                    </tr>
+                `;
+                lucide.createIcons();
+                return;
+            }
+            
+            const rows = jobs.map(job => {
+                const timeRemaining = formatTimeRemaining(job.time_remaining_seconds);
+                const timeoutClass = getTimeoutClass(job.timeout_status);
+                
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">${job.id.substring(0, 8)}...</div>
+                            ${job.kodosumi_run_id ? `<div class="text-xs text-gray-500">${job.kodosumi_run_id}</div>` : ''}
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">${job.flow_name}</div>
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap">
+                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(job.status)}">
+                                ${job.status.replace('_', ' ')}
+                            </span>
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap">
+                            ${job.timeout_at ? `
+                                <span class="text-sm ${timeoutClass}">
+                                    ${job.timeout_status === 'expired' ? '⚠️ EXPIRED' : 
+                                      job.timeout_status === 'critical' ? `🚨 ${timeRemaining}` :
+                                      job.timeout_status === 'warning' ? `⏰ ${timeRemaining}` :
+                                      `⏱️ ${timeRemaining}`}
+                                </span>
+                            ` : '<span class="text-gray-400">No timeout</span>'}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            tbody.innerHTML = rows;
+            lucide.createIcons();
+        }
+        
+        function isJobRunning(flowKey) {
+            return runningJobs.some(job => job.flow_path.includes(flowKey.replace(/-_/g, '').replace(/_-_/g, '')));
+        }
+        
+        function getStatusBadgeClass(status) {
+            switch (status) {
+                case 'running':
+                    return 'bg-green-100 text-green-800';
+                case 'starting':
+                    return 'bg-yellow-100 text-yellow-800';
+                case 'payment_confirmed':
+                    return 'bg-blue-100 text-blue-800';
+                default:
+                    return 'bg-gray-100 text-gray-800';
+            }
+        }
+        
+        function getTimeoutClass(status) {
+            switch (status) {
+                case 'critical':
+                case 'expired':
+                    return 'text-red-600 font-medium';
+                case 'warning':
+                    return 'text-yellow-600 font-medium';
+                default:
+                    return 'text-green-600';
+            }
+        }
+        
+        function formatTimeRemaining(seconds) {
+            if (!seconds || seconds <= 0) return 'Expired';
+            
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            
+            if (hours > 0) {
+                return `${hours}h ${minutes}m`;
+            } else if (minutes > 0) {
+                return `${minutes}m ${secs}s`;
+            } else {
+                return `${secs}s`;
+            }
+        }
+        
+        function formatDateTime(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleString();
+        }
+        
+        function showError(containerId, message) {
+            const container = document.getElementById(containerId);
+            const colspan = containerId === 'agents-table-body' ? '3' : '4';
+            container.innerHTML = `
+                <tr>
+                    <td colspan="${colspan}" class="px-4 py-8 text-center text-red-500">
+                        <i data-lucide="alert-circle" class="w-6 h-6 mx-auto mb-2"></i>
+                        <div>${message}</div>
+                    </td>
+                </tr>
+            `;
+            lucide.createIcons();
+        }
+        
+        async function enableAgent(flowKey) {
+            // Prompt for agent identifier
+            const agentIdentifier = prompt(
+                `Enter the agent identifier for ${flowKey}:\n\n` +
+                `This is your unique agent ID in the Masumi payment network.\n` +
+                `Example: my-seo-agent-v1`,
+                ''
+            );
+            
+            if (!agentIdentifier || agentIdentifier.trim() === '') {
+                return; // User cancelled or entered empty value
+            }
+            
+            await toggleAgent(flowKey, true, agentIdentifier.trim());
+        }
+        
+        async function disableAgent(flowKey) {
+            if (confirm(`Are you sure you want to disable agent: ${flowKey}?`)) {
+                await toggleAgent(flowKey, false);
+            }
+        }
+        
+        async function toggleAgent(flowKey, enable, agentIdentifier = null) {
+            try {
+                // Get API key from URL params if present (for basic auth flow)
+                const urlParams = new URLSearchParams(window.location.search);
+                const apiKey = urlParams.get('api_key');
+                
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
+                
+                // Add Authorization header if API key is available
+                if (apiKey) {
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                }
+                
+                const requestBody = {
+                    flow_key: flowKey,
+                    enable: enable
+                };
+                
+                // Add agent identifier if enabling
+                if (enable && agentIdentifier) {
+                    requestBody.agent_identifier = agentIdentifier;
+                }
+                
+                const response = await fetch('/admin/agents/toggle', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(requestBody)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Agent toggle result:', result);
+                    
+                    // Show success message
+                    if (enable) {
+                        alert(`Agent enabled successfully!\\n\\nAgent: ${flowKey}\\nIdentifier: ${agentIdentifier}`);
+                    } else {
+                        alert(`Agent disabled successfully!\\n\\nAgent: ${flowKey}`);
+                    }
+                    
+                    // Refresh data to show updated state
+                    await loadAgents();
+                } else {
+                    const error = await response.json();
+                    alert(`Failed to ${enable ? 'enable' : 'disable'} agent: ${error.detail || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Error toggling agent:', error);
+                alert(`Failed to ${enable ? 'enable' : 'disable'} agent: ${error.message}`);
+            }
+        }
+        
+        async function reloadRoutes() {
+            try {
+                // Get API key from URL params if present
+                const urlParams = new URLSearchParams(window.location.search);
+                const apiKey = urlParams.get('api_key');
+                
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
+                
+                // Add Authorization header if API key is available
+                if (apiKey) {
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                }
+                
+                const response = await fetch('/admin/reload-routes', {
+                    method: 'POST',
+                    headers: headers
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`Success: ${result.message}\n\nYou can now refresh the API Docs to see new endpoints.`);
+                } else {
+                    const error = await response.json();
+                    alert(`Failed to reload routes: ${error.detail || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Error reloading routes:', error);
+                alert(`Failed to reload routes: ${error.message}`);
+            }
+        }
     </script>
 </body>
 </html>

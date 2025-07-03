@@ -1,5 +1,4 @@
 import asyncio
-import structlog
 from typing import List
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,8 +6,9 @@ from masumi_kodosuni_connector.database.connection import AsyncSessionLocal
 from masumi_kodosuni_connector.database.repositories import FlowRunRepository
 from masumi_kodosuni_connector.services.agent_service import FlowService
 from masumi_kodosuni_connector.config.settings import settings
+from masumi_kodosuni_connector.config.logging import get_logger
 
-logger = structlog.get_logger()
+logger = get_logger("polling")
 
 
 class PollingService:
@@ -85,6 +85,18 @@ class PollingService:
     async def _process_single_job(self, service: FlowService, flow_run):
         """Process a single job with proper error handling."""
         try:
+            # Check for timeout first
+            if flow_run.timeout_at and datetime.utcnow() > flow_run.timeout_at:
+                logger.warning(
+                    "Job timed out - marking as TIMEOUT",
+                    run_id=flow_run.id,
+                    kodosumi_run_id=flow_run.kodosumi_run_id,
+                    timeout_at=flow_run.timeout_at.isoformat(),
+                    current_time=datetime.utcnow().isoformat()
+                )
+                await service.mark_job_as_timeout(flow_run.id)
+                return
+            
             await service.update_flow_run_from_kodosumi(flow_run)
             logger.debug(
                 "Job processed successfully",

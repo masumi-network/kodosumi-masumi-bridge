@@ -37,7 +37,14 @@
       "Bash(rg:*)",
       "Bash(./start.sh:*)",
       "Bash(nslookup:*)",
-      "Bash(env)"
+      "Bash(env)",
+      "Bash(docker-compose:*)",
+      "Bash(docker compose:*)",
+      "Bash(open:*)",
+      "Bash(docker:*)",
+      "Bash(alembic upgrade:*)",
+      "Bash(./venv/bin/python:*)",
+      "Bash(true)"
     ],
     "deny": []
   }

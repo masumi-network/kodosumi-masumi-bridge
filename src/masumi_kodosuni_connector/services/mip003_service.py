@@ -8,6 +8,7 @@ from masumi_kodosuni_connector.services.flow_discovery_service import flow_disco
 from masumi_kodosuni_connector.services.schema_converter import KodosumyToMIP003Converter
 from masumi_kodosuni_connector.models.agent_run import FlowRun, FlowRunStatus
 from masumi_kodosuni_connector.config.settings import settings
+from masumi_kodosuni_connector.config.logging import get_logger
 from masumi_kodosuni_connector.api.mip003_schemas import (
     JobStatus, StartJobResponse, JobStatusResponse, AmountInfo, InputField
 )
@@ -20,6 +21,7 @@ class MIP003Service:
         self.session = session
         self.flow_service = FlowService(session)
         self.converter = KodosumyToMIP003Converter()
+        self.logger = get_logger("mip003")
     
     async def start_job(
         self, 
@@ -55,10 +57,12 @@ class MIP003Service:
         
         # Get the real payment response data from Masumi
         payment_response = flow_run.payment_response
-        print(f"DEBUG: Retrieved payment_response: {payment_response}")
-        print(f"DEBUG: Retrieved payment_response type: {type(payment_response)}")
-        print(f"DEBUG: payment_response keys: {payment_response.keys() if payment_response else 'None'}")
-        print(f"DEBUG: input_hash in payment_response: {'input_hash' in payment_response if payment_response else 'No payment_response'}")
+        self.logger.debug("Retrieved payment response from flow run",
+                         has_payment_response=bool(payment_response),
+                         payment_response_type=type(payment_response).__name__,
+                         payment_response_keys=list(payment_response.keys()) if payment_response else None,
+                         has_input_hash='input_hash' in payment_response if payment_response else False)
+        
         payment_data = payment_response["data"]
         
         # Extract amounts from Masumi payment response (amounts are set by the masumi package)
@@ -104,13 +108,15 @@ class MIP003Service:
         
         flow_run = await self.flow_service.get_flow_run_status(job_id)
         if not flow_run:
+            self.logger.error("Job not found", job_id=job_id)
             raise ValueError("Job not found")
         
-        print(f"DEBUG: Job {job_id} status check:")
-        print(f"DEBUG: FlowRun status: {flow_run.status}")
-        print(f"DEBUG: FlowRun kodosumi_run_id: {flow_run.kodosumi_run_id}")
-        print(f"DEBUG: FlowRun result_data: {flow_run.result_data}")
-        print(f"DEBUG: FlowRun error_message: {flow_run.error_message}")
+        self.logger.debug("Job status check", 
+                         job_id=job_id,
+                         flow_run_status=flow_run.status,
+                         kodosumi_run_id=flow_run.kodosumi_run_id,
+                         has_result_data=bool(flow_run.result_data),
+                         has_error_message=bool(flow_run.error_message))
         
         # Map FlowRunStatus to MIP-003 JobStatus
         status_mapping = {
@@ -120,11 +126,14 @@ class MIP003Service:
             FlowRunStatus.RUNNING: JobStatus.RUNNING,
             FlowRunStatus.FINISHED: JobStatus.COMPLETED,
             FlowRunStatus.ERROR: JobStatus.FAILED,
-            FlowRunStatus.CANCELLED: JobStatus.FAILED
+            FlowRunStatus.CANCELLED: JobStatus.FAILED,
+            FlowRunStatus.TIMEOUT: JobStatus.FAILED
         }
         
         mip003_status = status_mapping.get(flow_run.status, JobStatus.PENDING)
-        print(f"DEBUG: Mapped to MIP-003 status: {mip003_status}")
+        self.logger.debug("Mapped flow status to MIP-003", 
+                         original_status=flow_run.status,
+                         mip003_status=mip003_status)
         
         # Prepare response
         response = JobStatusResponse(
@@ -139,7 +148,9 @@ class MIP003Service:
             response.message = "Job is being processed"
         elif mip003_status == JobStatus.COMPLETED and flow_run.result_data:
             formatted_result = self._format_result(flow_run.result_data)
-            print(f"DEBUG: Formatted result: {formatted_result[:200]}...")
+            self.logger.debug("Formatted job result", 
+                            result_length=len(formatted_result),
+                            result_preview=formatted_result[:200])
             response.result = formatted_result
             response.message = "Job completed successfully"
         elif mip003_status == JobStatus.FAILED and flow_run.error_message:
@@ -148,7 +159,11 @@ class MIP003Service:
         # TODO: Handle awaiting_input status for interactive flows
         # This would require checking Kodosumi events for input requests
         
-        print(f"DEBUG: Final response: status={response.status}, message={response.message}, has_result={bool(response.result)}")
+        self.logger.info("Job status response prepared", 
+                        job_id=job_id,
+                        status=response.status,
+                        has_message=bool(response.message),
+                        has_result=bool(response.result))
         return response
     
     async def provide_input(self, job_id: str, input_data: Dict[str, Any]) -> bool:

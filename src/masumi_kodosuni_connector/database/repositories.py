@@ -90,6 +90,7 @@ class FlowRunRepository:
         return result.rowcount > 0
     
     async def get_active_runs(self) -> List[FlowRun]:
+        """Get all flow runs that are actively processing (excludes finished, failed, timeout, etc.)"""
         result = await self.session.execute(
             select(FlowRun).where(
                 FlowRun.status.in_([
@@ -109,6 +110,16 @@ class FlowRunRepository:
             .limit(limit)
         )
         return result.scalars().all()
+    
+    async def update_timeout(self, flow_run_id: str, timeout_at: datetime) -> bool:
+        """Update the timeout_at field for a flow run."""
+        result = await self.session.execute(
+            update(FlowRun)
+            .where(FlowRun.id == flow_run_id)
+            .values(timeout_at=timeout_at)
+        )
+        await self.session.commit()
+        return result.rowcount > 0
     
     async def update_payment_id(self, run_id: str, payment_id: str) -> bool:
         """Update the Masumi payment ID for a flow run."""

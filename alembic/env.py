@@ -5,6 +5,8 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 from masumi_kodosuni_connector.models.agent_run import Base
+# Import all models to ensure they're registered with Base.metadata
+from masumi_kodosuni_connector.models.agent_config import AgentConfig
 from masumi_kodosuni_connector.config.settings import settings
 
 config = context.config
