@@ -26,6 +26,9 @@ Base = declarative_base()
 
 async def init_db():
     """Initialize database tables if they don't exist."""
+    # Import all models to ensure they're registered with SQLAlchemy
+    from masumi_kodosuni_connector.models import agent_config  # noqa: F401
+    
     async with engine.begin() as conn:
         await conn.run_sync(ModelsBase.metadata.create_all)
 

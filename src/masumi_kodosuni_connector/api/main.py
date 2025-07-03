@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import os
 from masumi_kodosuni_connector.api.agent_routes import create_flow_router
 from masumi_kodosuni_connector.api.mip003_routes import create_mip003_router, create_global_mip003_router
-from masumi_kodosuni_connector.database.connection import get_db
+from masumi_kodosuni_connector.database.connection import get_db, init_db
 from masumi_kodosuni_connector.database.repositories import FlowRunRepository
 from masumi_kodosuni_connector.services.agent_service import FlowService
 from masumi_kodosuni_connector.services.flow_discovery_service import flow_discovery
@@ -27,6 +27,11 @@ app = FastAPI(
 
 app.add_exception_handler(AgentServiceException, agent_service_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database tables on startup."""
+    await init_db()
 
 # Security setup
 security = HTTPBearer(auto_error=False)
