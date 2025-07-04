@@ -12,6 +12,7 @@ class FlowDiscoveryService:
         self._flows_cache: Dict[str, Dict[str, Any]] = {}
         self._last_refresh = 0
         self._cache_duration = 300  # 5 minutes
+        self._refresh_lock = asyncio.Lock()
     
     async def get_available_flows(self) -> Dict[str, Dict[str, Any]]:
         """Get available flows from Kodosumi, with caching."""
@@ -19,8 +20,13 @@ class FlowDiscoveryService:
         current_time = time.time()
         
         if current_time - self._last_refresh > self._cache_duration:
-            await self._refresh_flows()
-            self._last_refresh = current_time
+            # Use async lock to prevent concurrent cache refreshes
+            async with self._refresh_lock:
+                # Double-check the cache after acquiring the lock
+                # Another request might have refreshed it while we were waiting
+                if current_time - self._last_refresh > self._cache_duration:
+                    await self._refresh_flows()
+                    self._last_refresh = current_time
         
         return self._flows_cache
     
