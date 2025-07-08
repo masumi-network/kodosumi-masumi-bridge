@@ -37,12 +37,24 @@ async def startup_event():
     # Initialize Kodosumi connection and routes
     try:
         from masumi_kodosuni_connector.config.logging import get_logger
+        from masumi_kodosuni_connector.services.agent_config_manager import agent_config_manager
+        
         startup_logger = get_logger("startup")
         startup_logger.info("Initializing Kodosumi connection and API routes")
         
-        # Ensure connection is healthy
-        await flow_discovery.client.force_recovery()
+        # Initialize agent config cache first
+        startup_logger.info("Initializing agent configuration cache")
+        await agent_config_manager.refresh_cache()
+        startup_logger.info("Agent configuration cache initialized")
+        
+        # Force fresh authentication on startup
+        startup_logger.info("Forcing fresh Kodosumi authentication")
+        await flow_discovery.client.force_reconnect()
         startup_logger.info("Kodosumi connection established")
+        
+        # Get flows to trigger discovery
+        flows = await flow_discovery.get_available_flows()
+        startup_logger.info(f"Discovered {len(flows)} flows from Kodosumi")
         
         # Load and expose API routes
         global _flow_routers_added
@@ -249,8 +261,9 @@ async def health_check(detailed: bool = False):
     
     # Add database health check
     try:
+        from sqlalchemy import text
         async for db in get_db():
-            await db.execute("SELECT 1")
+            await db.execute(text("SELECT 1"))
             health_status["database"] = {"is_healthy": True}
             break
     except Exception as e:
@@ -270,7 +283,7 @@ async def recover_connection(_: bool = Depends(get_api_key)):
     try:
         # Step 1: Recover the connection
         recovery_steps.append("Recovering Kodosumi connection...")
-        await flow_discovery.client.force_recovery()
+        await flow_discovery.client.force_reconnect()
         recovery_steps.append("✓ Connection recovery completed")
         
         # Step 2: Reload the API routes

@@ -70,6 +70,29 @@ if [ $attempt -eq $max_attempts ]; then
     exit 1
 fi
 
+# Reload API routes after service is healthy
+echo "🔄 Reloading API routes..."
+# Check if API_KEY is set in .env
+API_KEY=$(grep "^API_KEY=" .env 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+if [ -n "$API_KEY" ]; then
+    # Use API key if available
+    curl -X POST http://localhost:8000/admin/reload-routes \
+        -H "Authorization: Bearer $API_KEY" \
+        -H "Content-Type: application/json" \
+        > /dev/null 2>&1
+else
+    # Try without API key (for backwards compatibility)
+    curl -X POST http://localhost:8000/admin/reload-routes \
+        -H "Content-Type: application/json" \
+        > /dev/null 2>&1
+fi
+
+if [ $? -eq 0 ]; then
+    echo "✅ API routes reloaded successfully!"
+else
+    echo "⚠️  Warning: Could not reload API routes. You may need to manually reload them via the admin panel."
+fi
+
 # Display status
 echo ""
 echo "🎉 Deployment successful!"

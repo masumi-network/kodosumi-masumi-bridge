@@ -43,7 +43,11 @@ class FlowDiscoveryService:
     async def _refresh_flows(self) -> None:
         """Refresh the flows cache from Kodosumi."""
         try:
-            flows = await self.client.get_available_flows()
+            # Add timeout to prevent hanging
+            flows = await asyncio.wait_for(
+                self.client.get_available_flows(), 
+                timeout=30.0
+            )
             self._flows_cache = {}
             
             for flow in flows:
@@ -69,9 +73,20 @@ class FlowDiscoveryService:
             
             logger.info("Refreshed flows cache", flow_count=len(self._flows_cache))
             
+        except asyncio.TimeoutError:
+            logger.error("Flow refresh timed out after 30 seconds")
+            # Try to force reconnect on timeout
+            try:
+                await self.client.force_reconnect()
+            except Exception as reconnect_error:
+                logger.error("Failed to reconnect after timeout", error=str(reconnect_error))
         except Exception as e:
             logger.error("Failed to refresh flows", error=str(e))
-            # Keep existing cache on error
+            # Try to force reconnect on any error
+            try:
+                await self.client.force_reconnect()
+            except Exception as reconnect_error:
+                logger.error("Failed to reconnect after error", error=str(reconnect_error))
     
     def get_flow_key_from_path(self, path: str) -> str:
         """Convert a URL path to a flow key."""

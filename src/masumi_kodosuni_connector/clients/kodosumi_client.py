@@ -126,8 +126,11 @@ class KodosumyClient:
         async with self._session_lock:
             self.logger.info("Authenticating with Kodosumi", url=f"{self.base_url}/login")
             
+            # Clear any existing session state before authenticating
+            self._clear_session_state()
+            
             try:
-                async with httpx.AsyncClient() as client:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
                     response = await kodosumi_http_client.request(
                         client, "post",
                         f"{self.base_url}/login",
@@ -195,9 +198,19 @@ class KodosumyClient:
         """Make an authenticated request with automatic retry on auth failure."""
         max_retries = 2
         
+        # Ensure timeout is set
+        if 'timeout' not in kwargs:
+            kwargs['timeout'] = 30.0
+        
         for attempt in range(max_retries + 1):
             try:
                 self._total_requests += 1
+                
+                # Always try to authenticate fresh if we're unhealthy
+                if not self._is_healthy or self._cookies is None:
+                    self.logger.info("Forcing fresh authentication due to unhealthy state")
+                    await self.authenticate()
+                
                 cookies = await self._ensure_authenticated()
                 
                 response = await kodosumi_http_client.request(
@@ -245,6 +258,19 @@ class KodosumyClient:
                     self.logger.error("All request attempts failed", 
                                     url=url,
                                     error=str(e))
+                    # If all attempts failed, try one more time with fresh auth
+                    if isinstance(e, (httpx.TimeoutException, httpx.ConnectError)):
+                        self.logger.info("Attempting final retry with fresh authentication")
+                        self._clear_session_state()
+                        await self.authenticate()
+                        response = await kodosumi_http_client.request(
+                            client, method, url, cookies=self._cookies, **kwargs
+                        )
+                        self._last_successful_request = time.time()
+                        self._connection_failures = 0
+                        self._is_healthy = True
+                        self._successful_requests += 1
+                        return response
                     raise
         
         # This should never be reached
@@ -581,7 +607,11 @@ class KodosumyClient:
     async def _perform_health_check(self) -> None:
         """Perform a health check by attempting to get flows."""
         try:
-            async with httpx.AsyncClient() as client:
+            # Always try fresh authentication for health check
+            self._clear_session_state()
+            await self.authenticate()
+            
+            async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
                 response = await self._make_authenticated_request(
                     client, "get", f"{self.base_url}/flow", timeout=10.0
                 )
@@ -596,10 +626,15 @@ class KodosumyClient:
                     
         except Exception as e:
             self.logger.warning("Health check exception", error=str(e))
-            # If health check fails, clear session state to force fresh authentication
-            self._clear_session_state()
-            raise
+            # Mark as unhealthy but don't raise - let recovery continue
+            self._is_healthy = False
 
+    async def force_reconnect(self) -> None:
+        """Force a fresh connection by clearing state and re-authenticating."""
+        self.logger.info("Forcing reconnection to Kodosumi")
+        self._clear_session_state()
+        await self.authenticate()
+        
     def _clear_session_state(self) -> None:
         """Clear session state to force fresh authentication on next request."""
         self.logger.info("Clearing session state to force re-authentication")
