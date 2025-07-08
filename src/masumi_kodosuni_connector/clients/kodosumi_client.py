@@ -374,7 +374,19 @@ class KodosumyClient:
                 self.logger.error("Kodosumi launch failed with error response",
                                 status_code=response.status_code,
                                 response_text=response.text[:500])  # Limit text length
-                return None  # Return None for error to prevent exception during debugging
+                
+                # Try to parse error response for validation errors
+                try:
+                    error_data = response.json()
+                    errors = error_data.get("errors", [])
+                    if errors:
+                        error_msg = f"Kodosumi validation errors: {errors}"
+                    else:
+                        error_msg = f"Kodosumi launch failed with status {response.status_code}: {response.text[:200]}"
+                except:
+                    error_msg = f"Kodosumi launch failed with status {response.status_code}: {response.text[:200]}"
+                
+                raise Exception(error_msg)
             
             response.raise_for_status()
             

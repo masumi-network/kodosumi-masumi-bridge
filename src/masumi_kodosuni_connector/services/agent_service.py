@@ -238,6 +238,7 @@ class FlowService:
                 flow_logger.info(f"Updated flow run status to STARTING with kodosumi_run_id: {kodosumi_run_id}")
             else:
                 flow_logger.error(f"No kodosumi_run_id returned from launch")
+                await self.repository.update_error(flow_run.id, "Kodosumi launch failed: No run ID returned")
         except Exception as e:
             flow_logger.error(f"Failed to launch Kodosumi flow: {str(e)}")
             await self.repository.update_error(flow_run.id, str(e))
