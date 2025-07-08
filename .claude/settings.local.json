@@ -46,7 +46,9 @@
       "Bash(./venv/bin/python:*)",
       "Bash(true)",
       "WebFetch(domain:pypi.org)",
-      "Bash(ss:*)"
+      "Bash(ss:*)",
+      "Bash(apt:*)",
+      "Bash(apt install:*)"
     ],
     "deny": []
   }

@@ -1,4 +1,6 @@
 import httpx
+import asyncio
+import time
 from typing import Dict, Any, Optional, List
 from masumi_kodosuni_connector.config.settings import settings
 from masumi_kodosuni_connector.config.logging import get_logger
@@ -99,25 +101,156 @@ class KodosumyClient:
         self.username = settings.kodosumi_username
         self.password = settings.kodosumi_password
         self._cookies: Optional[httpx.Cookies] = None
+        self._session_expires_at: Optional[float] = None
+        self._session_lock = asyncio.Lock()
+        self._last_successful_request = time.time()
+        self._connection_failures = 0
+        self._max_connection_failures = 3
+        self._is_healthy = True
+        self._recovery_task: Optional[asyncio.Task] = None
+        self._recovery_interval = 300  # 5 minutes
+        self._recovery_backoff = 1.0  # Start with 1 second backoff
+        self._max_recovery_backoff = 300  # Max 5 minutes between recovery attempts
+        self._keepalive_task: Optional[asyncio.Task] = None
+        self._keepalive_interval = 600  # 10 minutes
+        self._keepalive_enabled = True
+        self._connection_start_time = time.time()
+        self._total_requests = 0
+        self._successful_requests = 0
+        self._failed_requests = 0
+        self._last_health_check = None
         self.logger = get_logger("kodosumi.client")
     
     async def authenticate(self) -> None:
-        async with httpx.AsyncClient() as client:
-            response = await kodosumi_http_client.request(
-                client, "post",
-                f"{self.base_url}/login",
-                data={"name": self.username, "password": self.password},
-                timeout=30.0
-            )
-            self._cookies = response.cookies
+        """Authenticate with Kodosumi and store session cookies with expiration tracking."""
+        async with self._session_lock:
+            self.logger.info("Authenticating with Kodosumi", url=f"{self.base_url}/login")
+            
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await kodosumi_http_client.request(
+                        client, "post",
+                        f"{self.base_url}/login",
+                        data={"name": self.username, "password": self.password},
+                        timeout=30.0
+                    )
+                    
+                    if response.status_code == 200:
+                        self._cookies = response.cookies
+                        # Set session expiration to 22 hours from now (assuming 24h session lifetime)
+                        # This provides a 2-hour buffer to prevent session expiry edge cases
+                        self._session_expires_at = time.time() + (22 * 60 * 60)
+                        self._last_successful_request = time.time()
+                        self._connection_failures = 0
+                        self._is_healthy = True
+                        self.logger.info("Authentication successful", expires_at=self._session_expires_at)
+                        # Start keepalive task after successful authentication
+                        self._start_keepalive_task()
+                    else:
+                        self._connection_failures += 1
+                        self.logger.error("Authentication failed", 
+                                        status_code=response.status_code,
+                                        response_text=response.text[:200])
+                        raise Exception(f"Authentication failed: {response.status_code}")
+                        
+            except Exception as e:
+                self._connection_failures += 1
+                self._is_healthy = False
+                self.logger.error("Authentication exception", 
+                                error=str(e),
+                                failure_count=self._connection_failures)
+                raise
     
     async def _ensure_authenticated(self) -> httpx.Cookies:
-        if self._cookies is None:
+        """Ensure we have valid authentication cookies, re-authenticating if necessary."""
+        current_time = time.time()
+        
+        # Check if we need to authenticate or re-authenticate
+        needs_auth = (
+            self._cookies is None or 
+            self._session_expires_at is None or 
+            current_time >= self._session_expires_at - 600  # Re-auth 10 minutes before expiry
+        )
+        
+        if needs_auth:
+            self.logger.info("Session expired or missing, re-authenticating", 
+                           has_cookies=self._cookies is not None,
+                           expires_at=self._session_expires_at,
+                           current_time=current_time)
             await self.authenticate()
+        
         return self._cookies
     
+    async def _handle_auth_failure(self, response: httpx.Response) -> bool:
+        """Handle authentication failures by checking status codes and re-authenticating."""
+        if response.status_code in [401, 403, 404, 500, 502, 503, 504]:
+            self.logger.warning("Authentication/connectivity failure detected, invalidating session", 
+                              status_code=response.status_code)
+            # Clear session data to force re-authentication
+            self._clear_session_state()
+            return True
+        return False
+    
+    async def _make_authenticated_request(self, client: httpx.AsyncClient, method: str, url: str, **kwargs) -> httpx.Response:
+        """Make an authenticated request with automatic retry on auth failure."""
+        max_retries = 2
+        
+        for attempt in range(max_retries + 1):
+            try:
+                self._total_requests += 1
+                cookies = await self._ensure_authenticated()
+                
+                response = await kodosumi_http_client.request(
+                    client, method, url, cookies=cookies, **kwargs
+                )
+                
+                # Check for auth failure
+                if await self._handle_auth_failure(response):
+                    if attempt < max_retries:
+                        self.logger.info("Retrying request after auth failure", 
+                                       attempt=attempt + 1, 
+                                       url=url)
+                        continue
+                    else:
+                        self.logger.error("Max auth retries exceeded", url=url)
+                        response.raise_for_status()
+                
+                # Update health status on success
+                self._last_successful_request = time.time()
+                self._connection_failures = 0
+                self._is_healthy = True
+                self._successful_requests += 1
+                
+                return response
+                
+            except Exception as e:
+                self._connection_failures += 1
+                self._failed_requests += 1
+                if self._connection_failures >= self._max_connection_failures:
+                    self._is_healthy = False
+                    self.logger.error("Connection marked as unhealthy", 
+                                    failure_count=self._connection_failures,
+                                    error=str(e))
+                    # Start recovery process
+                    self._start_recovery_task()
+                
+                if attempt < max_retries:
+                    wait_time = (2 ** attempt) * 1.0  # Exponential backoff
+                    self.logger.warning("Request failed, retrying", 
+                                      attempt=attempt + 1,
+                                      wait_time=wait_time,
+                                      error=str(e))
+                    await asyncio.sleep(wait_time)
+                else:
+                    self.logger.error("All request attempts failed", 
+                                    url=url,
+                                    error=str(e))
+                    raise
+        
+        # This should never be reached
+        raise Exception("Unexpected end of retry loop")
+    
     async def get_available_flows(self) -> List[Dict[str, Any]]:
-        cookies = await self._ensure_authenticated()
         all_flows = []
         offset = None
         page_size = 10  # Default page size
@@ -132,10 +265,8 @@ class KodosumyClient:
                     url += f"?offset={offset}"
                 
                 self.logger.debug("Requesting flows page", url=url, offset=offset)
-                response = await kodosumi_http_client.request(
-                    client, "get", url,
-                    cookies=cookies,
-                    timeout=30.0
+                response = await self._make_authenticated_request(
+                    client, "get", url, timeout=30.0
                 )
                 data = response.json()
                 
@@ -179,20 +310,15 @@ class KodosumyClient:
         return all_flows
     
     async def get_flow_schema(self, flow_path: str) -> Dict[str, Any]:
-        cookies = await self._ensure_authenticated()
-        
         async with httpx.AsyncClient() as client:
-            response = await kodosumi_http_client.request(
+            response = await self._make_authenticated_request(
                 client, "get",
                 f"{self.base_url}{flow_path}",
-                cookies=cookies,
                 timeout=30.0
             )
             return response.json()
     
     async def launch_flow(self, flow_path: str, inputs: Dict[str, Any]) -> str:
-        cookies = await self._ensure_authenticated()
-        
         self.logger.info("Launching Kodosumi flow", 
                         flow_path=flow_path, 
                         input_keys=list(inputs.keys()),
@@ -200,10 +326,10 @@ class KodosumyClient:
         
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post(
+                response = await self._make_authenticated_request(
+                    client, "post",
                     f"{self.base_url}{flow_path}",
                     json=inputs,
-                    cookies=cookies,
                     timeout=30.0
                 )
                 
@@ -245,8 +371,6 @@ class KodosumyClient:
                 raise
     
     async def get_flow_status(self, flow_path: str, fid: str) -> Dict[str, Any]:
-        cookies = await self._ensure_authenticated()
-        
         self.logger.debug("Getting flow status", flow_path=flow_path, fid=fid)
         
         # Try the new API first, fall back to old API for compatibility
@@ -256,10 +380,8 @@ class KodosumyClient:
                 new_api_url = f"{self.base_url}/outputs/status/{fid}"
                 self.logger.debug("Trying new API endpoint", url=new_api_url)
                 
-                response = await client.get(
-                    new_api_url,
-                    cookies=cookies,
-                    timeout=30.0
+                response = await self._make_authenticated_request(
+                    client, "get", new_api_url, timeout=30.0
                 )
                 if response.status_code == 200:
                     self.logger.debug("Successfully used new API endpoint")
@@ -275,10 +397,8 @@ class KodosumyClient:
                 old_api_url = f"{self.base_url}{flow_path}?run_id={fid}"
                 self.logger.debug("Trying old API endpoint", url=old_api_url)
                 
-                response = await client.get(
-                    old_api_url,
-                    cookies=cookies,
-                    timeout=30.0
+                response = await self._make_authenticated_request(
+                    client, "get", old_api_url, timeout=30.0
                 )
                 if response.status_code == 200:
                     self.logger.debug("Successfully used old API endpoint")
@@ -419,3 +539,174 @@ class KodosumyClient:
                             flow_path=flow_path, 
                             fid=fid)
             return {"error": str(e)}
+    
+    def _start_recovery_task(self) -> None:
+        """Start the automatic recovery task if not already running."""
+        if self._recovery_task is None or self._recovery_task.done():
+            self._recovery_task = asyncio.create_task(self._recovery_loop())
+            self.logger.info("Started automatic connection recovery task")
+    
+    async def _recovery_loop(self) -> None:
+        """Background task to automatically recover unhealthy connections."""
+        while not self._is_healthy:
+            try:
+                await asyncio.sleep(self._recovery_backoff)
+                self.logger.info("Attempting connection recovery", 
+                               backoff_seconds=self._recovery_backoff)
+                
+                # Try to perform a health check
+                await self._perform_health_check()
+                
+                if self._is_healthy:
+                    self.logger.info("Connection recovery successful")
+                    self._recovery_backoff = 1.0  # Reset backoff
+                    break
+                else:
+                    # Increase backoff for next attempt
+                    self._recovery_backoff = min(
+                        self._recovery_backoff * 2, 
+                        self._max_recovery_backoff
+                    )
+                    self.logger.warning("Connection recovery failed, will retry", 
+                                      next_attempt_in=self._recovery_backoff)
+                    
+            except Exception as e:
+                self.logger.error("Error in recovery loop", error=str(e))
+                self._recovery_backoff = min(
+                    self._recovery_backoff * 2, 
+                    self._max_recovery_backoff
+                )
+                await asyncio.sleep(self._recovery_backoff)
+    
+    async def _perform_health_check(self) -> None:
+        """Perform a health check by attempting to get flows."""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await self._make_authenticated_request(
+                    client, "get", f"{self.base_url}/flow", timeout=10.0
+                )
+                if response.status_code == 200:
+                    self.logger.info("Health check successful")
+                    self._is_healthy = True
+                    self._connection_failures = 0
+                    self._last_successful_request = time.time()
+                    self._last_health_check = time.time()
+                else:
+                    self.logger.warning("Health check failed", status_code=response.status_code)
+                    
+        except Exception as e:
+            self.logger.warning("Health check exception", error=str(e))
+            # If health check fails, clear session state to force fresh authentication
+            self._clear_session_state()
+            raise
+
+    def _clear_session_state(self) -> None:
+        """Clear session state to force fresh authentication on next request."""
+        self.logger.info("Clearing session state to force re-authentication")
+        self._cookies = None
+        self._session_expires_at = None
+    
+    async def get_connection_health(self) -> Dict[str, Any]:
+        """Get detailed connection health information."""
+        current_time = time.time()
+        session_time_remaining = 0
+        
+        if self._session_expires_at:
+            session_time_remaining = max(0, self._session_expires_at - current_time)
+        
+        connection_uptime = current_time - self._connection_start_time
+        success_rate = (self._successful_requests / self._total_requests * 100) if self._total_requests > 0 else 0
+        
+        return {
+            "is_healthy": self._is_healthy,
+            "connection_failures": self._connection_failures,
+            "max_connection_failures": self._max_connection_failures,
+            "last_successful_request": self._last_successful_request,
+            "seconds_since_last_success": current_time - self._last_successful_request,
+            "session_expires_at": self._session_expires_at,
+            "session_time_remaining_seconds": session_time_remaining,
+            "has_valid_session": self._cookies is not None,
+            "recovery_task_running": self._recovery_task is not None and not self._recovery_task.done(),
+            "recovery_backoff_seconds": self._recovery_backoff,
+            "keepalive_task_running": self._keepalive_task is not None and not self._keepalive_task.done(),
+            "keepalive_enabled": self._keepalive_enabled,
+            "keepalive_interval_seconds": self._keepalive_interval,
+            "connection_uptime_seconds": connection_uptime,
+            "connection_uptime_hours": connection_uptime / 3600,
+            "total_requests": self._total_requests,
+            "successful_requests": self._successful_requests,
+            "failed_requests": self._failed_requests,
+            "success_rate_percentage": round(success_rate, 2),
+            "last_health_check": self._last_health_check,
+            "seconds_since_last_health_check": current_time - self._last_health_check if self._last_health_check else None
+        }
+    
+    def stop_recovery(self) -> None:
+        """Stop the recovery task (useful for cleanup)."""
+        if self._recovery_task and not self._recovery_task.done():
+            self._recovery_task.cancel()
+            self.logger.info("Stopped connection recovery task")
+    
+    def _start_keepalive_task(self) -> None:
+        """Start the keepalive task if not already running."""
+        if self._keepalive_enabled and (self._keepalive_task is None or self._keepalive_task.done()):
+            self._keepalive_task = asyncio.create_task(self._keepalive_loop())
+            self.logger.info("Started connection keepalive task", 
+                           interval_seconds=self._keepalive_interval)
+    
+    async def _keepalive_loop(self) -> None:
+        """Background task to keep the connection alive with periodic health checks."""
+        while self._keepalive_enabled and self._is_healthy:
+            try:
+                await asyncio.sleep(self._keepalive_interval)
+                
+                # Only do keepalive if we're healthy and have a session
+                if self._is_healthy and self._cookies is not None:
+                    self.logger.debug("Performing keepalive health check")
+                    await self._perform_health_check()
+                    
+            except asyncio.CancelledError:
+                self.logger.info("Keepalive task cancelled")
+                break
+            except Exception as e:
+                self.logger.warning("Keepalive check failed", error=str(e))
+                # Don't break the loop, just log the error
+                continue
+    
+    def stop_keepalive(self) -> None:
+        """Stop the keepalive task."""
+        self._keepalive_enabled = False
+        if self._keepalive_task and not self._keepalive_task.done():
+            self._keepalive_task.cancel()
+            self.logger.info("Stopped connection keepalive task")
+    
+    def enable_keepalive(self, interval_seconds: int = 600) -> None:
+        """Enable keepalive with custom interval."""
+        self._keepalive_enabled = True
+        self._keepalive_interval = interval_seconds
+        self._start_keepalive_task()
+        self.logger.info("Enabled connection keepalive", interval_seconds=interval_seconds)
+    
+    async def force_recovery(self) -> None:
+        """Force immediate connection recovery by clearing state and re-authenticating."""
+        self.logger.info("Forcing connection recovery")
+        
+        # Stop existing tasks
+        self.stop_recovery()
+        self.stop_keepalive()
+        
+        # Clear all state
+        self._clear_session_state()
+        self._connection_failures = 0
+        self._is_healthy = True
+        
+        # Re-authenticate
+        await self.authenticate()
+        
+        self.logger.info("Forced recovery completed")
+    
+    def cleanup(self) -> None:
+        """Cleanup all background tasks."""
+        self.stop_recovery()
+        self.stop_keepalive()
+        self.logger.info("Cleaned up all background tasks")

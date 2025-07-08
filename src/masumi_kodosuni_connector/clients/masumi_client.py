@@ -57,6 +57,7 @@ class MasumiClient:
         instance.flow_key = None  # Not needed for completion
         instance.agent_identifier = agent_identifier
         instance.seller_vkey = settings.seller_vkey
+        instance.logger = get_logger("payment")  # Add missing logger
         instance._initialize_masumi()
         return instance
     

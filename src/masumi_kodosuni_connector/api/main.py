@@ -30,8 +30,40 @@ app.add_exception_handler(Exception, general_exception_handler)
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database tables on startup."""
+    """Initialize database tables and setup Kodosumi connection on startup."""
+    # Initialize database
     await init_db()
+    
+    # Initialize Kodosumi connection and routes
+    try:
+        from masumi_kodosuni_connector.config.logging import get_logger
+        startup_logger = get_logger("startup")
+        startup_logger.info("Initializing Kodosumi connection and API routes")
+        
+        # Ensure connection is healthy
+        await flow_discovery.client.force_recovery()
+        startup_logger.info("Kodosumi connection established")
+        
+        # Load and expose API routes
+        global _flow_routers_added
+        _flow_routers_added = False
+        await add_flow_routes(force_reload=True)
+        startup_logger.info("Flow routes loaded and exposed")
+        
+        # Get health status for logging
+        health = await flow_discovery.client.get_connection_health()
+        flows_count = len(await flow_discovery.get_available_flows())
+        startup_logger.info("Startup complete", 
+                          flows_available=flows_count, 
+                          connection_healthy=health.get('is_healthy', False),
+                          keepalive_active=health.get('keepalive_task_running', False))
+        
+    except Exception as e:
+        from masumi_kodosuni_connector.config.logging import get_logger
+        startup_logger = get_logger("startup")
+        startup_logger.warning("Could not fully initialize Kodosumi connection on startup", 
+                             error=str(e),
+                             recovery_info="Use POST /admin/recover-connection to retry")
 
 # Security setup
 security = HTTPBearer(auto_error=False)
@@ -167,8 +199,143 @@ async def list_all_flows_for_admin(_: bool = Depends(get_api_key)):
     }
 
 @app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+async def health_check(detailed: bool = False):
+    """Get health status including Kodosumi connection health.
+    
+    Args:
+        detailed (bool): If True, return detailed connection metrics. 
+                        If False (default), return only basic health status.
+    
+    Returns:
+        dict: Health status information including:
+            - status: "healthy" or "degraded"
+            - service: Service name and version
+            - kodosumi_connection: Connection health metrics
+            - database: Database connection status
+    """
+    # Get basic health status
+    health_status = {
+        "status": "healthy",
+        "service": "Masumi Kodosumi Connector",
+        "version": "0.1.0"
+    }
+    
+    # Try to get Kodosumi connection health
+    try:
+        # Use the existing singleton client from flow_discovery
+        kodosumi_health = await flow_discovery.client.get_connection_health()
+        
+        # Determine overall health based on Kodosumi connection
+        if not kodosumi_health.get("is_healthy", False):
+            health_status["status"] = "degraded"
+        
+        if detailed:
+            # Include all connection details when requested
+            health_status["kodosumi_connection"] = kodosumi_health
+        else:
+            # Include only basic health info by default
+            health_status["kodosumi_connection"] = {
+                "is_healthy": kodosumi_health.get("is_healthy", False),
+                "connection_failures": kodosumi_health.get("connection_failures", 0),
+                "success_rate_percentage": kodosumi_health.get("success_rate_percentage", 0),
+                "has_valid_session": kodosumi_health.get("has_valid_session", False)
+            }
+    except Exception as e:
+        health_status["status"] = "degraded"
+        health_status["kodosumi_connection"] = {
+            "is_healthy": False,
+            "error": str(e)
+        }
+    
+    # Add database health check
+    try:
+        async for db in get_db():
+            await db.execute("SELECT 1")
+            health_status["database"] = {"is_healthy": True}
+            break
+    except Exception as e:
+        health_status["status"] = "degraded"
+        health_status["database"] = {
+            "is_healthy": False,
+            "error": str(e)
+        }
+    
+    return health_status
+
+@app.post("/admin/recover-connection")
+async def recover_connection(_: bool = Depends(get_api_key)):
+    """Manually trigger connection recovery for Kodosumi client and reload routes."""
+    recovery_steps = []
+    
+    try:
+        # Step 1: Recover the connection
+        recovery_steps.append("Recovering Kodosumi connection...")
+        await flow_discovery.client.force_recovery()
+        recovery_steps.append("✓ Connection recovery completed")
+        
+        # Step 2: Reload the API routes
+        recovery_steps.append("Reloading flow routes...")
+        global _flow_routers_added
+        _flow_routers_added = False  # Reset the flag
+        await add_flow_routes(force_reload=True)
+        recovery_steps.append("✓ Flow routes reloaded successfully")
+        
+        # Step 3: Get updated health status
+        health = await flow_discovery.client.get_connection_health()
+        recovery_steps.append("✓ Recovery process completed")
+        
+        return {
+            "status": "success",
+            "message": "Full connection and routes recovery completed successfully",
+            "recovery_steps": recovery_steps,
+            "connection_health": health
+        }
+        
+    except Exception as e:
+        recovery_steps.append(f"✗ Recovery failed: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Recovery failed: {str(e)}",
+            "recovery_steps": recovery_steps,
+            "error": str(e)
+        }
+
+@app.get("/admin/connection-monitor")
+async def connection_monitor(_: bool = Depends(get_api_key)):
+    """Monitor connection status and recommend recovery if needed."""
+    try:
+        health = await flow_discovery.client.get_connection_health()
+        
+        # Determine if recovery is recommended
+        needs_recovery = (
+            not health.get("is_healthy", False) or
+            health.get("connection_failures", 0) >= health.get("max_connection_failures", 3) or
+            health.get("success_rate_percentage", 100) < 80 or
+            not health.get("has_valid_session", True)
+        )
+        
+        recommendation = "none"
+        if needs_recovery:
+            recommendation = "immediate_recovery"
+        elif health.get("success_rate_percentage", 100) < 95:
+            recommendation = "monitor_closely"
+        
+        return {
+            "status": "healthy" if not needs_recovery else "degraded",
+            "needs_recovery": needs_recovery,
+            "recommendation": recommendation,
+            "connection_health": health,
+            "recovery_endpoint": "/admin/recover-connection"
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "needs_recovery": True,
+            "recommendation": "immediate_recovery",
+            "error": str(e),
+            "recovery_endpoint": "/admin/recover-connection"
+        }
 
 @app.get("/admin/running-jobs")
 async def get_running_jobs(db: AsyncSession = Depends(get_db), _: bool = Depends(get_api_key)):

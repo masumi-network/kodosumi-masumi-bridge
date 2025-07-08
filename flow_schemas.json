@@ -1,0 +1,743 @@
+{
+  "118ab47193c15124d67ddca9d1a3f174": {
+    "summary": "AI Health & Fitness Planner",
+    "url": "/-/localhost/8001/health-fitness-agent/-/",
+    "schema": {
+      "summary": "AI Health & Fitness Planner",
+      "description": "AI-powered personalized health and fitness planning with custom dietary and workout recommendations",
+      "tags": [
+        "Health",
+        "Fitness",
+        "Diet",
+        "Workout",
+        "AI"
+      ],
+      "openapi_extra": {
+        "x-kodosumi": true,
+        "x-author": "kodosumi",
+        "x-version": "1.0.0"
+      },
+      "elements": [
+        {
+          "type": "markdown",
+          "text": "\n    # AI Health & Fitness Planner\n                \n    Get personalized dietary and fitness plans tailored to your goals and preferences.\n    Our AI-powered system considers your unique profile to create the perfect plan for you.\n    \n    **Features:**\n    - Personalized meal planning\n    - Custom workout routines\n    - Goal-specific recommendations\n    - Nutritional guidance\n    - Exercise instructions\n    "
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "age",
+          "label": "Age",
+          "value": "25",
+          "required": false,
+          "placeholder": "Enter your age (e.g., 25)",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "weight",
+          "label": "Weight (kg)",
+          "value": "70",
+          "required": false,
+          "placeholder": "Enter your weight in kg (e.g., 70)",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "height",
+          "label": "Height (cm)",
+          "value": "170",
+          "required": false,
+          "placeholder": "Enter your height in cm (e.g., 170)",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "sex",
+          "label": "Sex",
+          "value": "Male",
+          "required": false,
+          "placeholder": "Male, Female, or Other",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "activity_level",
+          "label": "Activity Level",
+          "value": "Moderately Active",
+          "required": false,
+          "placeholder": "Sedentary, Lightly Active, Moderately Active, Very Active, Extremely Active",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "dietary_preferences",
+          "label": "Dietary Preferences",
+          "value": "No specific preference",
+          "required": false,
+          "placeholder": "Vegetarian, Keto, Gluten Free, Low Carb, Dairy Free, etc.",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "fitness_goals",
+          "label": "Fitness Goals",
+          "value": "Stay Fit",
+          "required": false,
+          "placeholder": "Lose Weight, Gain Muscle, Endurance, Stay Fit, Strength Training",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "submit",
+          "text": "Generate My Personalized Plan"
+        },
+        {
+          "type": "cancel",
+          "text": "Cancel"
+        }
+      ]
+    }
+  },
+  "81d80ae37eb170803ced05617e4b2b77": {
+    "summary": "AI Movie Production Agent",
+    "url": "/-/localhost/8001/movie-production-agent/-/",
+    "schema": {
+      "summary": "AI Movie Production Agent",
+      "description": "AI-powered movie concept development with script writing and casting suggestions",
+      "tags": [
+        "Movie",
+        "Script",
+        "Casting",
+        "Entertainment",
+        "AI"
+      ],
+      "openapi_extra": {
+        "x-kodosumi": true,
+        "x-author": "kodosumi",
+        "x-version": "1.0.0"
+      },
+      "elements": [
+        {
+          "type": "markdown",
+          "text": "\n    # \ud83c\udfac AI Movie Production Agent\n                \n    Bring your movie ideas to life with AI-powered script writing and casting direction.\n    Our specialized agents will develop your concept into a professional movie pitch.\n    \n    **Features:**\n    - Professional script outline development\n    - Character creation and development\n    - AI-powered casting suggestions\n    - Three-act structure planning\n    - Production timeline estimates\n    - Marketing strategy recommendations\n    "
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "movie_idea",
+          "label": "Movie Idea",
+          "value": "A young programmer discovers their code can alter reality",
+          "required": false,
+          "placeholder": "Describe your movie idea in detail...",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "genre",
+          "label": "Genre",
+          "value": "Sci-Fi",
+          "required": false,
+          "placeholder": "Action, Comedy, Drama, Sci-Fi, Horror, Romance, Thriller",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "target_audience",
+          "label": "Target Audience",
+          "value": "General",
+          "required": false,
+          "placeholder": "General, Children, Teenagers, Adults, Mature",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "estimated_runtime",
+          "label": "Estimated Runtime (minutes)",
+          "value": "120",
+          "required": false,
+          "placeholder": "Enter runtime in minutes (60-300)",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "submit",
+          "text": "Develop Movie Concept"
+        },
+        {
+          "type": "cancel",
+          "text": "Cancel"
+        }
+      ]
+    }
+  },
+  "6947795d6e0163c15a78cdfb0c219021": {
+    "summary": "AttentionInsight Analysis Agent",
+    "url": "/-/localhost/8001/attention-insights-agent/-/",
+    "schema": {
+      "summary": "AttentionInsight Analysis Agent",
+      "description": "Analyze images to predict visual attention patterns using AI-powered heatmaps and focus maps.",
+      "tags": [
+        "AttentionInsight",
+        "Image Analysis",
+        "Visual Attention",
+        "Heatmap"
+      ],
+      "openapi_extra": {
+        "x-kodosumi": true,
+        "x-author": "kodosumi@example.com",
+        "x-version": "1.0.0"
+      },
+      "elements": [
+        {
+          "type": "markdown",
+          "text": "\n    # AttentionInsight Analysis Agent\n                \n    This agent analyzes images using AttentionInsight API to predict where people will look when viewing an image.\n    It generates heatmaps, saliency maps, and focus maps to understand visual attention patterns.\n    "
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "image_input",
+          "label": "Image URL or File Path",
+          "value": "https://example.com/image.jpg",
+          "required": false,
+          "placeholder": "Enter image URL (http/https) or local file path",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "submit",
+          "text": "Analyze Image"
+        },
+        {
+          "type": "cancel",
+          "text": "Cancel"
+        }
+      ]
+    }
+  },
+  "11fdbae4fe5a7b513688268612e7e43e": {
+    "summary": "Coding Tutorial Generator Agent",
+    "url": "/-/localhost/8001/coding-tutorial-agent/-/",
+    "schema": {
+      "summary": "Coding Tutorial Generator Agent",
+      "description": "AI-powered tutorial generator that creates comprehensive programming tutorials by analyzing and comparing content from multiple websites.",
+      "tags": [
+        "CrewAI",
+        "Programming",
+        "Tutorial",
+        "Education",
+        "Web Scraping"
+      ],
+      "openapi_extra": {
+        "x-kodosumi": true,
+        "x-author": "your.email@domain.com",
+        "x-version": "1.0.0"
+      },
+      "elements": [
+        {
+          "type": "markdown",
+          "text": "\n    # Coding Tutorial Generator Agent\n    \n    Generate comprehensive programming tutorials by analyzing and comparing content from multiple websites.\n    This AI agent scrapes programming-related URLs, analyzes the content, and creates well-structured tutorials.\n    \n    **Features:**\n    - Multi-website content analysis\n    - Automatic tutorial structuring\n    - Code formatting and explanations\n    - Reference citations and source tracking\n    - Programming-focused content filtering\n    "
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "query",
+          "label": "Tutorial Topic/Query",
+          "value": null,
+          "required": true,
+          "placeholder": "Enter the programming topic you want to learn about (e.g., 'Python decorators', 'React hooks', 'Git branching')",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "text",
+          "name": "urls",
+          "label": "URLs (comma-separated)",
+          "value": null,
+          "required": true,
+          "placeholder": "Enter programming-related URLs separated by commas (e.g., https://example1.com, https://example2.com)",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "submit",
+          "text": "Generate Tutorial"
+        },
+        {
+          "type": "cancel",
+          "text": "Cancel"
+        }
+      ]
+    }
+  },
+  "8ffb7bc2ec08e83b92d97075e96a5eb1": {
+    "summary": "Content to NFT Agent",
+    "url": "/-/localhost/8001/nft-agent/-/",
+    "schema": {
+      "summary": "Content to NFT Agent",
+      "description": "Generate AI content (images/videos) and mint as NFTs on Cardano blockchain using NMKR Studio.",
+      "tags": [
+        "NFT",
+        "AI Generation",
+        "Cardano",
+        "NMKR",
+        "Content Creation"
+      ],
+      "openapi_extra": {
+        "x-kodosumi": true,
+        "x-author": "your-email@example.com",
+        "x-version": "1.0.0"
+      },
+      "elements": [
+        {
+          "type": "markdown",
+          "text": "\n    # Content to NFT Agent\n                \n    This agent generates AI content (images or videos) based on your description and mints it as an NFT on the Cardano blockchain.\n    The NFT will be sent directly to your Cardano wallet address.\n    "
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "prompt",
+          "label": "Content Description",
+          "value": "A digital painting of a futuristic city with floating islands",
+          "required": false,
+          "placeholder": "Describe the image or video you want to generate",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "text",
+          "name": "content_type",
+          "label": "Content Type (image or video)",
+          "value": "image",
+          "required": false,
+          "placeholder": "Enter 'image' or 'video'",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "text",
+          "name": "wallet_address",
+          "label": "Cardano Wallet Address",
+          "value": "addr1qx47ranxl4p5l97hwtd6793tavxqzzn6mtgmg6ztwf7356x6cluln4vc579dv335axeyk9a9fg9seql3h2d230vve5wsmdxufg",
+          "required": false,
+          "placeholder": "Your Cardano wallet address (addr_test1... or addr1...)",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "text",
+          "name": "display_name",
+          "label": "NFT Display Name",
+          "value": "AI NFT",
+          "required": false,
+          "placeholder": "Name for your NFT",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "submit",
+          "text": "Generate & Mint NFT"
+        },
+        {
+          "type": "cancel",
+          "text": "Cancel"
+        }
+      ]
+    }
+  },
+  "c37fe78b3fdffb326c589da9e80e7d4b": {
+    "summary": "DeepSeek Research Agent",
+    "url": "/-/localhost/8001/deepseek-research-agent/-/",
+    "schema": {
+      "summary": "DeepSeek Research Agent",
+      "description": "Conduct comprehensive research and analysis using DeepSeek's advanced AI models including reasoning capabilities.",
+      "tags": [
+        "DeepSeek",
+        "Research",
+        "AI",
+        "Analysis",
+        "Reasoning"
+      ],
+      "openapi_extra": {
+        "x-kodosumi": true,
+        "x-author": "kodosumi@example.com",
+        "x-version": "1.0.0"
+      },
+      "elements": [
+        {
+          "type": "markdown",
+          "text": "\n    # DeepSeek Research Agent\n                \n    This agent uses DeepSeek's advanced AI models to conduct comprehensive research and analysis.\n    Choose between regular chat completion or the advanced reasoning model for complex queries.\n    "
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "query",
+          "label": "Research Query",
+          "value": "",
+          "required": false,
+          "placeholder": "Enter your research question or topic...",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "submit",
+          "text": "Start Research"
+        },
+        {
+          "type": "cancel",
+          "text": "Cancel"
+        }
+      ]
+    }
+  },
+  "3043c765df8e86b8fc2aaa13669f3e7c": {
+    "summary": "LLMs.txt Generator Agent",
+    "url": "/-/localhost/8001/llm-txt-agent/-/",
+    "schema": {
+      "summary": "LLMs.txt Generator Agent",
+      "description": "Generate LLMs.txt files from websites using Firecrawl API and upload to Digital Ocean Spaces.",
+      "tags": [
+        "LLMs.txt",
+        "Website Analysis",
+        "Firecrawl",
+        "Digital Ocean"
+      ],
+      "openapi_extra": {
+        "x-kodosumi": true,
+        "x-author": "your-email@example.com",
+        "x-version": "1.0.0"
+      },
+      "elements": [
+        {
+          "type": "markdown",
+          "text": "\n    # LLMs.txt Generator Agent\n                \n    This agent generates LLMs.txt files from websites using Firecrawl API and uploads them to Digital Ocean Spaces for download.\n    LLMs.txt files contain website content optimized for Large Language Models.\n    "
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "urls",
+          "label": "Website URLs (separate multiple URLs with semicolons)",
+          "value": "https://masumi.network; https://docs.masumi.network",
+          "required": false,
+          "placeholder": "Enter website URLs separated by semicolons",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "text",
+          "name": "max_urls",
+          "label": "Max URLs per site (default: 15)",
+          "value": "15",
+          "required": false,
+          "placeholder": "Maximum number of URLs to analyze per site",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "text",
+          "name": "show_full_text",
+          "label": "Show full text (true/false)",
+          "value": "true",
+          "required": false,
+          "placeholder": "Enter 'true' for full text or 'false' for summary",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "submit",
+          "text": "Generate LLMs.txt"
+        },
+        {
+          "type": "cancel",
+          "text": "Cancel"
+        }
+      ]
+    }
+  },
+  "25756b9515963e6f38d538a34ba8cfdb": {
+    "summary": "Media Trend Analysis Agent",
+    "url": "/-/localhost/8001/media-trend-agent/-/",
+    "schema": {
+      "summary": "Media Trend Analysis Agent",
+      "description": "AI-powered media trend analysis with advanced reporting capabilities",
+      "tags": [
+        "Media",
+        "Trends",
+        "Analysis",
+        "AI"
+      ],
+      "openapi_extra": {
+        "x-kodosumi": true,
+        "x-author": "kodosumi",
+        "x-version": "1.0.0"
+      },
+      "elements": [
+        {
+          "type": "markdown",
+          "text": "\n    # Media Trend Analysis Agent\n                \n    This agent analyzes media trends across digital platforms using advanced AI tools.\n    It identifies emerging trends, analyzes patterns, and provides actionable insights.\n    \n    **Features:**\n    - Keyword-based trend analysis\n    - Source-specific monitoring\n    - Growth rate calculations\n    - Future trend predictions\n    - Comprehensive reporting\n    "
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "keywords",
+          "label": "Keywords",
+          "value": "ai agents",
+          "required": false,
+          "placeholder": "Enter keywords to analyze (e.g., 'ai agents', 'cryptocurrency')",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "sources",
+          "label": "Sources (Optional)",
+          "value": "verge.com, linkedin.com, x.com",
+          "required": false,
+          "placeholder": "Enter specific sources (e.g., 'verge.com, linkedin.com')",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "analysis_days",
+          "label": "Analysis Days",
+          "value": "30",
+          "required": false,
+          "placeholder": "Number of days to analyze (default: 30)",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "submit",
+          "text": "Analyze Media Trends"
+        },
+        {
+          "type": "cancel",
+          "text": "Cancel"
+        }
+      ]
+    }
+  },
+  "63f54a4d4a69af35b150276e0537b875": {
+    "summary": "Meeting Preparation Agent",
+    "url": "/-/localhost/8001/meeting-agent/-/",
+    "schema": {
+      "summary": "Meeting Preparation Agent",
+      "description": "AI-powered meeting preparation using CrewAI agents for context analysis, industry insights, and strategic planning.",
+      "tags": [
+        "Meeting",
+        "CrewAI",
+        "Business Analysis",
+        "Strategy"
+      ],
+      "openapi_extra": {
+        "x-kodosumi": true,
+        "x-author": "your-email@example.com",
+        "x-version": "1.0.0"
+      },
+      "elements": [
+        {
+          "type": "markdown",
+          "text": "\n    # Meeting Preparation Agent\n                \n    This agent creates comprehensive meeting preparation packages using AI agents.\n    It analyzes company context, industry insights, and creates strategic meeting agendas.\n    "
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "company_name",
+          "label": "Company Name",
+          "value": "Masumi Network",
+          "required": false,
+          "placeholder": null,
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "text",
+          "name": "meeting_objective",
+          "label": "Meeting Objective",
+          "value": "Discuss new marketing strategies",
+          "required": false,
+          "placeholder": null,
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "text",
+          "name": "attendees",
+          "label": "Attendees (separate with semicolons)",
+          "value": "Patrick Tobler, CEO; Keanu Klestil, Developer",
+          "required": false,
+          "placeholder": null,
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "text",
+          "name": "meeting_duration",
+          "label": "Meeting Duration (minutes)",
+          "value": "90",
+          "required": false,
+          "placeholder": null,
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "text",
+          "name": "focus_areas",
+          "label": "Focus Areas",
+          "value": "Market expansion opportunities and competitive analysis",
+          "required": false,
+          "placeholder": null,
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "submit",
+          "text": "Prepare Meeting"
+        },
+        {
+          "type": "cancel",
+          "text": "Cancel"
+        }
+      ]
+    }
+  },
+  "8202ae8fd722f10a1e66a264e269ae67": {
+    "summary": "Press Release Writer Agent",
+    "url": "/-/localhost/8001/pr-writer-agent/-/",
+    "schema": {
+      "summary": "Press Release Writer Agent",
+      "description": "AI-powered press release generator that creates professional, engaging content from your input text and optional website analysis.",
+      "tags": [
+        "CrewAI",
+        "PR",
+        "Content Creation",
+        "Writing"
+      ],
+      "openapi_extra": {
+        "x-kodosumi": true,
+        "x-author": "your.email@domain.com",
+        "x-version": "1.0.0"
+      },
+      "elements": [
+        {
+          "type": "markdown",
+          "text": "\n    # Press Release Writer Agent\n    \n    Create professional, engaging press releases from your input text and optional URLs.\n    This AI agent analyzes your information, scrapes relevant websites, and generates \n    high-quality press releases tailored to your specifications.\n    \n    **Features:**\n    - Intelligent content analysis\n    - Website scraping for additional context\n    - Professional press release formatting\n    - SEO-optimized content structure\n    "
+        },
+        {
+          "type": "html",
+          "text": "<div class=\"space\"></div>"
+        },
+        {
+          "type": "text",
+          "name": "text",
+          "label": "Press Release Information",
+          "value": null,
+          "required": true,
+          "placeholder": "Enter the information for your press release. Include URLs if you want the agent to scrape additional context from websites.",
+          "size": null,
+          "pattern": null
+        },
+        {
+          "type": "submit",
+          "text": "Generate Press Release"
+        },
+        {
+          "type": "cancel",
+          "text": "Cancel"
+        }
+      ]
+    }
+  }
+}
