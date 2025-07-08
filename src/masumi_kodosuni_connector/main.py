@@ -25,6 +25,20 @@ async def lifespan(app):
     except Exception as e:
         logger.error("Failed to initialize database", error=str(e))
     
+    # Resume payment monitoring for pending jobs after restart
+    try:
+        from masumi_kodosuni_connector.database.connection import AsyncSessionLocal
+        from masumi_kodosuni_connector.services.agent_service import FlowService
+        
+        async with AsyncSessionLocal() as session:
+            flow_service = FlowService(session)
+            await flow_service.resume_payment_monitoring()
+        
+        logger.info("Payment monitoring recovery completed successfully")
+    except Exception as e:
+        logger.error("Failed to resume payment monitoring", error=str(e))
+        # Don't fail startup if payment recovery fails - service can still function
+    
     polling_task = asyncio.create_task(polling_service.start())
     
     try:

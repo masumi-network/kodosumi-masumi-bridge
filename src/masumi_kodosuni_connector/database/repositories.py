@@ -102,6 +102,15 @@ class FlowRunRepository:
         )
         return result.scalars().all()
     
+    async def get_pending_payment_runs(self) -> List[FlowRun]:
+        """Get all flow runs that are waiting for payment confirmation."""
+        result = await self.session.execute(
+            select(FlowRun).where(
+                FlowRun.status == FlowRunStatus.PENDING_PAYMENT
+            )
+        )
+        return result.scalars().all()
+    
     async def get_runs_by_flow(self, flow_path: str, limit: int = 50) -> List[FlowRun]:
         result = await self.session.execute(
             select(FlowRun)

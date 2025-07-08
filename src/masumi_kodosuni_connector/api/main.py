@@ -497,3 +497,22 @@ async def reload_routes(_: bool = Depends(get_api_key)):
             status_code=500,
             detail=f"Error reloading routes: {str(e)}"
         )
+
+@app.post("/admin/resume-payment-monitoring")
+async def resume_payment_monitoring(
+    _: bool = Depends(get_api_key),
+    db: AsyncSession = Depends(get_db)
+):
+    """Resume payment monitoring for all pending payment jobs."""
+    try:
+        service = FlowService(db)
+        await service.resume_payment_monitoring()
+        return {
+            "status": "success",
+            "message": "Payment monitoring resumed successfully for all pending jobs."
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error resuming payment monitoring: {str(e)}"
+        )

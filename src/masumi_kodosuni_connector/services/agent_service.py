@@ -405,3 +405,63 @@ class FlowService:
             )
         )
         await self.repository.session.commit()
+    
+    async def resume_payment_monitoring(self) -> None:
+        """Resume payment monitoring for all pending payment jobs after service restart."""
+        flow_logger.info("=== RESUMING PAYMENT MONITORING ===")
+        
+        try:
+            # Get all jobs waiting for payment
+            pending_jobs = await self.repository.get_pending_payment_runs()
+            
+            if not pending_jobs:
+                flow_logger.info("No pending payment jobs found to resume monitoring for")
+                return
+            
+            flow_logger.info(f"Found {len(pending_jobs)} pending payment jobs to resume monitoring")
+            
+            recovery_count = 0
+            error_count = 0
+            
+            for flow_run in pending_jobs:
+                try:
+                    flow_logger.info(f"Resuming payment monitoring for job {flow_run.id}")
+                    
+                    # Extract flow_key from stored payment response or derive from flow_path
+                    flow_key = None
+                    if hasattr(flow_run, 'payment_response') and flow_run.payment_response:
+                        flow_key = flow_run.payment_response.get('flow_key')
+                    
+                    if not flow_key:
+                        # Fallback: derive flow_key from flow_path
+                        flow_key = flow_run.flow_path.strip('/').replace('/', '_').replace('-', '_')
+                        flow_logger.info(f"Derived flow_key from flow_path: {flow_key}")
+                    
+                    # Create MasumiClient for this flow
+                    try:
+                        masumi_client = MasumiClient(flow_key)
+                        flow_logger.info(f"Created MasumiClient for flow_key: {flow_key}")
+                    except ValueError as e:
+                        flow_logger.error(f"Failed to create MasumiClient for job {flow_run.id}: {str(e)}")
+                        # Mark job as error if agent identifier is not configured
+                        await self.repository.update_error(flow_run.id, f"Payment monitoring recovery failed: {str(e)}")
+                        error_count += 1
+                        continue
+                    
+                    # Resume payment monitoring
+                    await self._start_payment_monitoring(flow_run.id, masumi_client)
+                    recovery_count += 1
+                    
+                    flow_logger.info(f"Successfully resumed payment monitoring for job {flow_run.id}")
+                    
+                except Exception as e:
+                    flow_logger.error(f"Failed to resume payment monitoring for job {flow_run.id}: {str(e)}")
+                    # Mark job as error
+                    await self.repository.update_error(flow_run.id, f"Payment monitoring recovery failed: {str(e)}")
+                    error_count += 1
+            
+            flow_logger.info(f"Payment monitoring recovery completed: {recovery_count} successful, {error_count} errors")
+            
+        except Exception as e:
+            flow_logger.error(f"Payment monitoring recovery failed: {str(e)}")
+            raise

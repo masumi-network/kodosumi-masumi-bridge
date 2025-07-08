@@ -51,7 +51,9 @@
       "Bash(apt install:*)",
       "Bash(git config:*)",
       "Bash(git push:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git rm:*)"
     ],
     "deny": []
   }
