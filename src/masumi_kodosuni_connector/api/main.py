@@ -519,11 +519,39 @@ async def reload_routes(_: bool = Depends(get_api_key)):
     """Reload flow routes to include newly enabled agents in API docs."""
     try:
         global _flow_routers_added
-        _flow_routers_added = False  # Reset the flag
+        
+        # Remove existing flow routes first (using the proper FastAPI method)
+        routes_to_remove = []
+        for route in app.routes:
+            # Mark flow routes for removal
+            if (hasattr(route, 'path') and 
+               (route.path.startswith('/-_localhost_') or 
+                route.path.startswith('/mip003/-_localhost_'))):
+                routes_to_remove.append(route)
+        
+        # Remove the routes
+        for route in routes_to_remove:
+            app.routes.remove(route)
+        
+        # Reset the flag and add routes again
+        _flow_routers_added = False
         await add_flow_routes(force_reload=True)
+        
+        # Force regeneration of OpenAPI schema
+        app.openapi_schema = None
+        
+        # Force cache busting by clearing any internal caches
+        if hasattr(app, '_docs_cache'):
+            delattr(app, '_docs_cache')
+        if hasattr(app, '_redoc_cache'):
+            delattr(app, '_redoc_cache')
+        
         return {
             "status": "success",
-            "message": "Flow routes reloaded successfully. New agents should now appear in API docs."
+            "message": "Flow routes reloaded successfully. IMPORTANT: Refresh your browser at /docs to see the new routes.",
+            "routes_added": len([r for r in app.routes if hasattr(r, 'path') and 
+                               (r.path.startswith('/-_localhost_') or r.path.startswith('/mip003/-_localhost_'))]),
+            "note": "If routes don't appear in /docs, hard refresh your browser (Ctrl+F5 or Cmd+Shift+R)"
         }
     except Exception as e:
         raise HTTPException(

@@ -93,7 +93,7 @@ while [ $connection_attempt -lt $max_connection_attempts ]; do
     # Check health endpoint for Kodosumi connection status
     HEALTH_RESPONSE=$(curl -s http://localhost:8000/health 2>/dev/null)
     
-    if echo "$HEALTH_RESPONSE" | grep -q '"kodosumi_connected":true'; then
+    if echo "$HEALTH_RESPONSE" | grep -q '"is_healthy":true'; then
         echo "✅ Kodosumi connection established!"
         break
     fi
@@ -153,6 +153,7 @@ while [ $reload_attempt -lt $max_reload_attempts ] && [ "$reload_success" = fals
     
     if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
         echo "✅ API routes reloaded successfully!"
+        echo "   📝 NOTE: Refresh your browser at http://localhost:8000/docs to see the new routes"
         reload_success=true
     else
         echo "   ⚠️  Route reload failed (HTTP $HTTP_CODE)"
