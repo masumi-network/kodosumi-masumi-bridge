@@ -18,8 +18,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add timeout_at column to flow_runs table
-    op.add_column('flow_runs', sa.Column('timeout_at', sa.DateTime(), nullable=True))
+    # Add timeout_at column to flow_runs table if it doesn't exist
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col['name'] for col in inspector.get_columns('flow_runs')]
+    
+    if 'timeout_at' not in columns:
+        op.add_column('flow_runs', sa.Column('timeout_at', sa.DateTime(), nullable=True))
 
 
 def downgrade() -> None:
