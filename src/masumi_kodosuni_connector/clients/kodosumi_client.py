@@ -120,6 +120,16 @@ class KodosumyClient:
         self._failed_requests = 0
         self._last_health_check = None
         self.logger = get_logger("kodosumi.client")
+        
+        # Create persistent HTTP client with connection pooling
+        self._http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0),
+            limits=httpx.Limits(
+                max_connections=20,        # Maximum number of connections in pool
+                max_keepalive_connections=10,  # Keep 10 connections alive
+                keepalive_expiry=300      # Keep connections alive for 5 minutes
+            )
+        )
     
     async def authenticate(self) -> None:
         """Authenticate with Kodosumi and store session cookies with expiration tracking."""
@@ -130,31 +140,30 @@ class KodosumyClient:
             self._clear_session_state()
             
             try:
-                async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
-                    response = await kodosumi_http_client.request(
-                        client, "post",
-                        f"{self.base_url}/login",
-                        data={"name": self.username, "password": self.password},
-                        timeout=30.0
-                    )
-                    
-                    if response.status_code == 200:
-                        self._cookies = response.cookies
-                        # Set session expiration to 5 hours from now
-                        # Re-authenticate every 5 hours to ensure fresh sessions
-                        self._session_expires_at = time.time() + (5 * 60 * 60)
-                        self._last_successful_request = time.time()
-                        self._connection_failures = 0
-                        self._is_healthy = True
-                        self.logger.info("Authentication successful", expires_at=self._session_expires_at)
-                        # Start keepalive task after successful authentication
-                        self._start_keepalive_task()
-                    else:
-                        self._connection_failures += 1
-                        self.logger.error("Authentication failed", 
-                                        status_code=response.status_code,
-                                        response_text=response.text[:200])
-                        raise Exception(f"Authentication failed: {response.status_code}")
+                response = await kodosumi_http_client.request(
+                    self._http_client, "post",
+                    f"{self.base_url}/login",
+                    data={"name": self.username, "password": self.password},
+                    timeout=30.0
+                )
+                
+                if response.status_code == 200:
+                    self._cookies = response.cookies
+                    # Set session expiration to 5 hours from now
+                    # Re-authenticate every 5 hours to ensure fresh sessions
+                    self._session_expires_at = time.time() + (5 * 60 * 60)
+                    self._last_successful_request = time.time()
+                    self._connection_failures = 0
+                    self._is_healthy = True
+                    self.logger.info("Authentication successful", expires_at=self._session_expires_at)
+                    # Start keepalive task after successful authentication
+                    self._start_keepalive_task()
+                else:
+                    self._connection_failures += 1
+                    self.logger.error("Authentication failed", 
+                                    status_code=response.status_code,
+                                    response_text=response.text[:200])
+                    raise Exception(f"Authentication failed: {response.status_code}")
                         
             except Exception as e:
                 self._connection_failures += 1
@@ -283,66 +292,64 @@ class KodosumyClient:
         
         self.logger.info("Starting flow discovery", base_url=self.base_url)
         
-        async with httpx.AsyncClient() as client:
-            while True:
-                # Request flows with offset for pagination
-                url = f"{self.base_url}/flow"
-                if offset is not None:
-                    url += f"?offset={offset}"
-                
-                self.logger.debug("Requesting flows page", url=url, offset=offset)
-                response = await self._make_authenticated_request(
-                    client, "get", url, timeout=30.0
+        while True:
+            # Request flows with offset for pagination
+            url = f"{self.base_url}/flow"
+            if offset is not None:
+                url += f"?offset={offset}"
+            
+            self.logger.debug("Requesting flows page", url=url, offset=offset)
+            response = await self._make_authenticated_request(
+                self._http_client, "get", url, timeout=30.0
                 )
-                data = response.json()
-                
-                self.logger.debug("Flow API response received", 
-                                response_keys=list(data.keys()),
-                                status_code=response.status_code)
-                
-                items = data.get("items", [])
-                if not items:
-                    self.logger.debug("No more items found, ending pagination")
-                    break
-                
-                all_flows.extend(items)
-                self.logger.debug("Retrieved flows batch", 
-                                batch_size=len(items), 
-                                total_flows=len(all_flows))
-                
-                # If we got fewer items than expected page size, we're likely at the end
-                if len(items) < page_size:
-                    self.logger.debug("Partial batch received, assuming end of data", 
-                                    received=len(items), 
-                                    expected_page_size=page_size)
-                    break
-                
-                # Get the next offset from the API response
-                current_offset = data.get("offset")
-                if current_offset is None:
-                    self.logger.debug("No offset in response, ending pagination")
-                    break
-                
-                # Set offset for next request
-                offset = current_offset
-                
-                # Safety check to prevent infinite loops (max 100 pages)
-                if len(all_flows) > 1000:
-                    self.logger.warning("Safety limit reached, stopping flow discovery", 
-                                      flows_retrieved=len(all_flows))
-                    break
+            data = response.json()
+            
+            self.logger.debug("Flow API response received", 
+                            response_keys=list(data.keys()),
+                            status_code=response.status_code)
+            
+            items = data.get("items", [])
+            if not items:
+                self.logger.debug("No more items found, ending pagination")
+                break
+            
+            all_flows.extend(items)
+            self.logger.debug("Retrieved flows batch", 
+                            batch_size=len(items), 
+                            total_flows=len(all_flows))
+            
+            # If we got fewer items than expected page size, we're likely at the end
+            if len(items) < page_size:
+                self.logger.debug("Partial batch received, assuming end of data", 
+                                received=len(items), 
+                                expected_page_size=page_size)
+                break
+            
+            # Get the next offset from the API response
+            current_offset = data.get("offset")
+            if current_offset is None:
+                self.logger.debug("No offset in response, ending pagination")
+                break
+            
+            # Set offset for next request
+            offset = current_offset
+            
+            # Safety check to prevent infinite loops (max 100 pages)
+            if len(all_flows) > 1000:
+                self.logger.warning("Safety limit reached, stopping flow discovery", 
+                                  flows_retrieved=len(all_flows))
+                break
         
         self.logger.info("Flow discovery completed", total_flows=len(all_flows))
         return all_flows
     
     async def get_flow_schema(self, flow_path: str) -> Dict[str, Any]:
-        async with httpx.AsyncClient() as client:
-            response = await self._make_authenticated_request(
-                client, "get",
-                f"{self.base_url}{flow_path}",
-                timeout=30.0
-            )
-            return response.json()
+        response = await self._make_authenticated_request(
+            self._http_client, "get",
+            f"{self.base_url}{flow_path}",
+            timeout=30.0
+        )
+        return response.json()
     
     async def launch_flow(self, flow_path: str, inputs: Dict[str, Any]) -> str:
         self.logger.info("Launching Kodosumi flow", 
@@ -350,97 +357,95 @@ class KodosumyClient:
                         input_keys=list(inputs.keys()),
                         full_url=f"{self.base_url}{flow_path}")
         
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await self._make_authenticated_request(
-                    client, "post",
-                    f"{self.base_url}{flow_path}",
-                    json=inputs,
-                    timeout=30.0
-                )
-                
-                self.logger.debug("Kodosumi launch response received",
+        try:
+            response = await self._make_authenticated_request(
+                self._http_client, "post",
+                f"{self.base_url}{flow_path}",
+                json=inputs,
+                timeout=30.0
+            )
+            
+            self.logger.debug("Kodosumi launch response received",
+                            status_code=response.status_code,
+                            response_headers=dict(response.headers),
+                            response_size=len(response.text))
+            
+            if response.status_code >= 400:
+                self.logger.error("Kodosumi launch failed with error response",
                                 status_code=response.status_code,
-                                response_headers=dict(response.headers),
-                                response_size=len(response.text))
-                
-                if response.status_code >= 400:
-                    self.logger.error("Kodosumi launch failed with error response",
-                                    status_code=response.status_code,
-                                    response_text=response.text[:500])  # Limit text length
-                    return None  # Return None for error to prevent exception during debugging
-                
-                response.raise_for_status()
-                
-                # According to Kodosumi docs, successful POST returns {"result": "fid"}
-                data = response.json()
-                fid = data.get("result")
-                
-                if not fid:
-                    # Check for errors
-                    errors = data.get("errors")
-                    if errors:
-                        self.logger.error("Kodosumi validation errors", errors=errors)
-                        raise Exception(f"Kodosumi validation errors: {errors}")
-                    else:
-                        self.logger.error("No fid returned from Kodosumi", response_data=data)
-                        raise Exception(f"No fid returned from Kodosumi: {data}")
-                
-                self.logger.info("Flow launched successfully", fid=fid, flow_path=flow_path)
-                return fid
-                
-            except Exception as e:
-                self.logger.error("Kodosumi launch failed with exception", 
-                                error=str(e), 
-                                error_type=type(e).__name__,
-                                flow_path=flow_path)
-                raise
+                                response_text=response.text[:500])  # Limit text length
+                return None  # Return None for error to prevent exception during debugging
+            
+            response.raise_for_status()
+            
+            # According to Kodosumi docs, successful POST returns {"result": "fid"}
+            data = response.json()
+            fid = data.get("result")
+            
+            if not fid:
+                # Check for errors
+                errors = data.get("errors")
+                if errors:
+                    self.logger.error("Kodosumi validation errors", errors=errors)
+                    raise Exception(f"Kodosumi validation errors: {errors}")
+                else:
+                    self.logger.error("No fid returned from Kodosumi", response_data=data)
+                    raise Exception(f"No fid returned from Kodosumi: {data}")
+            
+            self.logger.info("Flow launched successfully", fid=fid, flow_path=flow_path)
+            return fid
+            
+        except Exception as e:
+            self.logger.error("Kodosumi launch failed with exception", 
+                            error=str(e), 
+                            error_type=type(e).__name__,
+                            flow_path=flow_path)
+            raise
     
     async def get_flow_status(self, flow_path: str, fid: str) -> Dict[str, Any]:
         self.logger.debug("Getting flow status", flow_path=flow_path, fid=fid)
         
         # Try the new API first, fall back to old API for compatibility
-        async with httpx.AsyncClient() as client:
-            try:
-                # Try new API endpoint first
-                new_api_url = f"{self.base_url}/outputs/status/{fid}"
-                self.logger.debug("Trying new API endpoint", url=new_api_url)
-                
-                response = await self._make_authenticated_request(
-                    client, "get", new_api_url, timeout=30.0
-                )
-                if response.status_code == 200:
-                    self.logger.debug("Successfully used new API endpoint")
-                    return response.json()
-                else:
-                    self.logger.debug("New API returned non-200 status", status_code=response.status_code)
-                    
-            except Exception as e:
-                self.logger.debug("New API failed, trying old API", error=str(e))
+        try:
+            # Try new API endpoint first
+            new_api_url = f"{self.base_url}/outputs/status/{fid}"
+            self.logger.debug("Trying new API endpoint", url=new_api_url)
             
-            try:
-                # Fall back to old API for existing jobs
-                old_api_url = f"{self.base_url}{flow_path}?run_id={fid}"
-                self.logger.debug("Trying old API endpoint", url=old_api_url)
-                
-                response = await self._make_authenticated_request(
-                    client, "get", old_api_url, timeout=30.0
+            response = await self._make_authenticated_request(
+                self._http_client, "get", new_api_url, timeout=30.0
                 )
-                if response.status_code == 200:
-                    self.logger.debug("Successfully used old API endpoint")
-                    return response.json()
-                else:
-                    self.logger.error("Old API also failed", 
-                                    status_code=response.status_code,
-                                    response_text=response.text[:200])
-                    response.raise_for_status()
-                    
-            except Exception as e:
-                self.logger.error("Both API endpoints failed", 
-                                final_error=str(e),
-                                flow_path=flow_path,
-                                fid=fid)
-                raise
+            if response.status_code == 200:
+                self.logger.debug("Successfully used new API endpoint")
+                return response.json()
+            else:
+                self.logger.debug("New API returned non-200 status", status_code=response.status_code)
+                
+        except Exception as e:
+            self.logger.debug("New API failed, trying old API", error=str(e))
+        
+        try:
+            # Fall back to old API for existing jobs
+            old_api_url = f"{self.base_url}{flow_path}?run_id={fid}"
+            self.logger.debug("Trying old API endpoint", url=old_api_url)
+            
+            response = await self._make_authenticated_request(
+                self._http_client, "get", old_api_url, timeout=30.0
+            )
+            if response.status_code == 200:
+                self.logger.debug("Successfully used old API endpoint")
+                return response.json()
+            else:
+                self.logger.error("Old API also failed", 
+                                status_code=response.status_code,
+                                response_text=response.text[:200])
+                response.raise_for_status()
+                
+        except Exception as e:
+            self.logger.error("Both API endpoints failed", 
+                            final_error=str(e),
+                            flow_path=flow_path,
+                            fid=fid)
+            raise
     
     async def get_flow_events(self, flow_path: str, fid: str) -> List[Dict[str, Any]]:
         # Since Kodosumi doesn't seem to have traditional events API,
@@ -611,18 +616,17 @@ class KodosumyClient:
             self._clear_session_state()
             await self.authenticate()
             
-            async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
-                response = await self._make_authenticated_request(
-                    client, "get", f"{self.base_url}/flow", timeout=10.0
-                )
-                if response.status_code == 200:
-                    self.logger.info("Health check successful")
-                    self._is_healthy = True
-                    self._connection_failures = 0
-                    self._last_successful_request = time.time()
-                    self._last_health_check = time.time()
-                else:
-                    self.logger.warning("Health check failed", status_code=response.status_code)
+            response = await self._make_authenticated_request(
+                self._http_client, "get", f"{self.base_url}/flow", timeout=10.0
+            )
+            if response.status_code == 200:
+                self.logger.info("Health check successful")
+                self._is_healthy = True
+                self._connection_failures = 0
+                self._last_successful_request = time.time()
+                self._last_health_check = time.time()
+            else:
+                self.logger.warning("Health check failed", status_code=response.status_code)
                     
         except Exception as e:
             self.logger.warning("Health check exception", error=str(e))
@@ -745,3 +749,19 @@ class KodosumyClient:
         self.stop_recovery()
         self.stop_keepalive()
         self.logger.info("Cleaned up all background tasks")
+    
+    async def close(self) -> None:
+        """Close the HTTP client and cleanup resources."""
+        self.logger.info("Closing KodosumyClient")
+        
+        # Stop background tasks
+        self.cleanup()
+        
+        # Close the HTTP client
+        if hasattr(self, '_http_client') and self._http_client is not None:
+            await self._http_client.aclose()
+            self.logger.info("HTTP client closed")
+        
+        # Clear session state
+        self._clear_session_state()
+        self.logger.info("KodosumyClient closed")
