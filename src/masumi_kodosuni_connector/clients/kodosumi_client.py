@@ -140,9 +140,9 @@ class KodosumyClient:
                     
                     if response.status_code == 200:
                         self._cookies = response.cookies
-                        # Set session expiration to 22 hours from now (assuming 24h session lifetime)
-                        # This provides a 2-hour buffer to prevent session expiry edge cases
-                        self._session_expires_at = time.time() + (22 * 60 * 60)
+                        # Set session expiration to 5 hours from now
+                        # Re-authenticate every 5 hours to ensure fresh sessions
+                        self._session_expires_at = time.time() + (5 * 60 * 60)
                         self._last_successful_request = time.time()
                         self._connection_failures = 0
                         self._is_healthy = True
