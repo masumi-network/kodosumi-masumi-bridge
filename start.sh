@@ -80,49 +80,91 @@ if [ $attempt -eq $max_attempts ]; then
     exit 1
 fi
 
-# Give the service a bit more time to fully initialize
-echo "⏳ Waiting for service to fully initialize..."
-sleep 5
+# Give the service time to fully initialize and connect to Kodosumi
+echo "⏳ Waiting for service to fully initialize and connect to Kodosumi..."
+sleep 15
+
+# Check if Kodosumi connection is established
+echo "🔍 Checking Kodosumi connection status..."
+max_connection_attempts=10
+connection_attempt=0
+
+while [ $connection_attempt -lt $max_connection_attempts ]; do
+    # Check health endpoint for Kodosumi connection status
+    HEALTH_RESPONSE=$(curl -s http://localhost:8000/health 2>/dev/null)
+    
+    if echo "$HEALTH_RESPONSE" | grep -q '"kodosumi_connected":true'; then
+        echo "✅ Kodosumi connection established!"
+        break
+    fi
+    
+    connection_attempt=$((connection_attempt + 1))
+    echo "   Connection attempt $connection_attempt/$max_connection_attempts - waiting for Kodosumi connection..."
+    sleep 3
+done
+
+if [ $connection_attempt -eq $max_connection_attempts ]; then
+    echo "⚠️  Warning: Kodosumi connection not fully established, but proceeding with route reload..."
+fi
 
 # Reload API routes after service is healthy
 echo "🔄 Reloading API routes..."
 # Check if API_KEY is set in .env
 API_KEY=$(grep "^API_KEY=" .env 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
 
-# Create a temporary file to capture response
-RESPONSE_FILE=$(mktemp)
+# Retry logic for route reloading
+max_reload_attempts=3
+reload_attempt=0
+reload_success=false
 
-if [ -n "$API_KEY" ]; then
-    echo "   Using API key authentication..."
-    # Use API key if available
-    HTTP_CODE=$(curl -X POST http://localhost:8000/admin/reload-routes \
-        -H "Authorization: Bearer $API_KEY" \
-        -H "Content-Type: application/json" \
-        -w "%{http_code}" \
-        -o "$RESPONSE_FILE" \
-        -s)
-else
-    echo "   No API key found, trying without authentication..."
-    # Try without API key (for backwards compatibility)
-    HTTP_CODE=$(curl -X POST http://localhost:8000/admin/reload-routes \
-        -H "Content-Type: application/json" \
-        -w "%{http_code}" \
-        -o "$RESPONSE_FILE" \
-        -s)
-fi
+while [ $reload_attempt -lt $max_reload_attempts ] && [ "$reload_success" = false ]; do
+    reload_attempt=$((reload_attempt + 1))
+    echo "   Route reload attempt $reload_attempt/$max_reload_attempts..."
+    
+    # Create a temporary file to capture response
+    RESPONSE_FILE=$(mktemp)
+    
+    if [ -n "$API_KEY" ]; then
+        echo "   Using API key authentication..."
+        # Use API key if available
+        HTTP_CODE=$(curl -X POST http://localhost:8000/admin/reload-routes \
+            -H "Authorization: Bearer $API_KEY" \
+            -H "Content-Type: application/json" \
+            -w "%{http_code}" \
+            -o "$RESPONSE_FILE" \
+            -s)
+    else
+        echo "   No API key found, trying without authentication..."
+        # Try without API key (for backwards compatibility)
+        HTTP_CODE=$(curl -X POST http://localhost:8000/admin/reload-routes \
+            -H "Content-Type: application/json" \
+            -w "%{http_code}" \
+            -o "$RESPONSE_FILE" \
+            -s)
+    fi
+    
+    RESPONSE=$(cat "$RESPONSE_FILE")
+    rm -f "$RESPONSE_FILE"
+    
+    echo "   HTTP Response Code: $HTTP_CODE"
+    if [ -n "$RESPONSE" ]; then
+        echo "   Response: $RESPONSE"
+    fi
+    
+    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
+        echo "✅ API routes reloaded successfully!"
+        reload_success=true
+    else
+        echo "   ⚠️  Route reload failed (HTTP $HTTP_CODE)"
+        if [ $reload_attempt -lt $max_reload_attempts ]; then
+            echo "   Waiting 10 seconds before retry..."
+            sleep 10
+        fi
+    fi
+done
 
-RESPONSE=$(cat "$RESPONSE_FILE")
-rm -f "$RESPONSE_FILE"
-
-echo "   HTTP Response Code: $HTTP_CODE"
-if [ -n "$RESPONSE" ]; then
-    echo "   Response: $RESPONSE"
-fi
-
-if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
-    echo "✅ API routes reloaded successfully!"
-else
-    echo "⚠️  Warning: Could not reload API routes (HTTP $HTTP_CODE). You may need to manually reload them via the admin panel."
+if [ "$reload_success" = false ]; then
+    echo "❌ Failed to reload API routes after $max_reload_attempts attempts. You may need to manually reload them via the admin panel."
 fi
 
 # Display status
