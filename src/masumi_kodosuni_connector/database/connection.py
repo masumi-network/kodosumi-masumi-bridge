@@ -8,8 +8,8 @@ engine = create_async_engine(
     echo=settings.debug,
     future=True,
     # Connection pool configuration for better concurrency
-    pool_size=20,           # Number of connections to maintain in the pool
-    max_overflow=30,        # Additional connections beyond pool_size
+    pool_size=50,           # Number of connections to maintain in the pool
+    max_overflow=100,       # Additional connections beyond pool_size
     pool_pre_ping=True,     # Validate connections before use
     pool_recycle=3600,      # Recycle connections after 1 hour
     pool_timeout=30,        # Timeout for getting connection from pool

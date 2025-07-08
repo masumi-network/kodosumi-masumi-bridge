@@ -5,11 +5,24 @@ services:
       POSTGRES_DB: masumi_connector
       POSTGRES_USER: masumi_user
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Hj8nK4qW7rT3xZ9mV2cF6bN0pL5uY1eR}
+      # PostgreSQL configuration for higher connection limits
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     restart: unless-stopped
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U masumi_user -d masumi_connector"]
       interval: 10s
