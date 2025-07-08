@@ -18,6 +18,16 @@ if ! docker compose version &> /dev/null; then
     exit 1
 fi
 
+# Check if Docker containers are running and shut them down if they are
+echo "🔍 Checking for existing Docker containers..."
+if docker compose ps -q 2>/dev/null | grep -q .; then
+    echo "🛑 Stopping existing Docker containers..."
+    docker compose down
+    echo "✅ Containers stopped."
+else
+    echo "✅ No existing containers found."
+fi
+
 # Check if .env file exists
 if [ ! -f .env ]; then
     echo "📝 Creating .env file from template..."
@@ -70,27 +80,49 @@ if [ $attempt -eq $max_attempts ]; then
     exit 1
 fi
 
+# Give the service a bit more time to fully initialize
+echo "⏳ Waiting for service to fully initialize..."
+sleep 5
+
 # Reload API routes after service is healthy
 echo "🔄 Reloading API routes..."
 # Check if API_KEY is set in .env
 API_KEY=$(grep "^API_KEY=" .env 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+
+# Create a temporary file to capture response
+RESPONSE_FILE=$(mktemp)
+
 if [ -n "$API_KEY" ]; then
+    echo "   Using API key authentication..."
     # Use API key if available
-    curl -X POST http://localhost:8000/admin/reload-routes \
+    HTTP_CODE=$(curl -X POST http://localhost:8000/admin/reload-routes \
         -H "Authorization: Bearer $API_KEY" \
         -H "Content-Type: application/json" \
-        > /dev/null 2>&1
+        -w "%{http_code}" \
+        -o "$RESPONSE_FILE" \
+        -s)
 else
+    echo "   No API key found, trying without authentication..."
     # Try without API key (for backwards compatibility)
-    curl -X POST http://localhost:8000/admin/reload-routes \
+    HTTP_CODE=$(curl -X POST http://localhost:8000/admin/reload-routes \
         -H "Content-Type: application/json" \
-        > /dev/null 2>&1
+        -w "%{http_code}" \
+        -o "$RESPONSE_FILE" \
+        -s)
 fi
 
-if [ $? -eq 0 ]; then
+RESPONSE=$(cat "$RESPONSE_FILE")
+rm -f "$RESPONSE_FILE"
+
+echo "   HTTP Response Code: $HTTP_CODE"
+if [ -n "$RESPONSE" ]; then
+    echo "   Response: $RESPONSE"
+fi
+
+if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
     echo "✅ API routes reloaded successfully!"
 else
-    echo "⚠️  Warning: Could not reload API routes. You may need to manually reload them via the admin panel."
+    echo "⚠️  Warning: Could not reload API routes (HTTP $HTTP_CODE). You may need to manually reload them via the admin panel."
 fi
 
 # Display status

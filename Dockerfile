@@ -19,11 +19,6 @@ COPY src/ ./src/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
 COPY .env.example .env
-COPY docker-entrypoint.sh ./
-
-# Make entrypoint executable
-RUN chmod +x /app/docker-entrypoint.sh
-
 # Set environment variables
 ENV PYTHONPATH=/app/src
 
@@ -34,5 +29,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the application with entrypoint script
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+# Run the application directly
+CMD ["python", "-m", "uvicorn", "masumi_kodosuni_connector.main:app", "--host", "0.0.0.0", "--port", "8000"]
