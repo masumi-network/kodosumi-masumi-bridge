@@ -352,14 +352,20 @@ async def connection_monitor(_: bool = Depends(get_api_key)):
 
 @app.get("/admin/running-jobs")
 async def get_running_jobs(db: AsyncSession = Depends(get_db), _: bool = Depends(get_api_key)):
-    """Get currently running jobs with timeout information."""
+    """Get currently active jobs including pending payments and running jobs."""
     repository = FlowRunRepository(db)
+    
+    # Get both active runs and pending payment runs
     active_runs = await repository.get_active_runs()
+    pending_payment_runs = await repository.get_pending_payment_runs()
+    
+    # Combine all jobs that need attention
+    all_jobs = list(active_runs) + list(pending_payment_runs)
     
     from datetime import datetime
     
     running_jobs = []
-    for run in active_runs:
+    for run in all_jobs:
         # Calculate time remaining until timeout
         time_remaining = None
         timeout_status = "none"
@@ -380,6 +386,18 @@ async def get_running_jobs(db: AsyncSession = Depends(get_db), _: bool = Depends
             else:
                 timeout_status = "expired"
         
+        # Calculate time since creation for pending payments
+        time_since_created = None
+        if run.created_at:
+            time_since_created = int((datetime.utcnow() - run.created_at).total_seconds())
+        
+        # Add payment monitoring status for pending payments
+        payment_monitoring_status = "unknown"
+        if run.status == "pending_payment":
+            payment_monitoring_status = "monitoring"  # Assuming monitoring is active after recovery
+        elif run.status in ["payment_confirmed", "starting", "running"]:
+            payment_monitoring_status = "confirmed"
+        
         running_jobs.append({
             "id": run.id,
             "flow_name": run.flow_name,
@@ -390,13 +408,28 @@ async def get_running_jobs(db: AsyncSession = Depends(get_db), _: bool = Depends
             "timeout_at": run.timeout_at.isoformat() if run.timeout_at else None,
             "time_remaining_seconds": time_remaining,
             "timeout_status": timeout_status,
+            "time_since_created_seconds": time_since_created,
+            "payment_monitoring_status": payment_monitoring_status,
             "kodosumi_run_id": run.kodosumi_run_id,
-            "masumi_payment_id": run.masumi_payment_id
+            "masumi_payment_id": run.masumi_payment_id,
+            "is_pending_payment": run.status == "pending_payment"
         })
+    
+    # Calculate summary statistics
+    total_jobs = len(running_jobs)
+    pending_payment_count = len([job for job in running_jobs if job["is_pending_payment"]])
+    active_processing_count = total_jobs - pending_payment_count
     
     return {
         "running_jobs": running_jobs,
-        "total_running": len(running_jobs)
+        "total_jobs": total_jobs,
+        "pending_payment_count": pending_payment_count,
+        "active_processing_count": active_processing_count,
+        "summary": {
+            "total": total_jobs,
+            "pending_payment": pending_payment_count,
+            "active_processing": active_processing_count
+        }
     }
 
 @app.get("/admin")
