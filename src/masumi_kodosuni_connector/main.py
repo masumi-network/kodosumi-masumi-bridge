@@ -51,6 +51,14 @@ async def lifespan(app):
             await polling_task
         except asyncio.CancelledError:
             pass
+        
+        # Close KodosumyClient to prevent resource leaks
+        try:
+            from masumi_kodosuni_connector.services.flow_discovery_service import flow_discovery
+            await flow_discovery.client.close()
+            logger.info("KodosumyClient closed successfully")
+        except Exception as e:
+            logger.warning("Error closing KodosumyClient", error=str(e))
 
 app.router.lifespan_context = lifespan
 

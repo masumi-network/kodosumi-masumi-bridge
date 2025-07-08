@@ -297,11 +297,11 @@ class FlowService:
                         identifier_from_purchaser = None
                         
                         if hasattr(flow_run, 'payment_response') and flow_run.payment_response:
-                            payment_data = flow_run.payment_response.get('data', {})
-                            blockchain_identifier = payment_data.get('blockchainIdentifier')
-                            identifier_from_purchaser = payment_data.get('identifierFromPurchaser')
-                            agent_identifier = flow_run.payment_response.get('agent_identifier')
-                            saved_flow_key = flow_run.payment_response.get('flow_key')
+                            payment_data = flow_run.payment_response.get('data', {}) if flow_run.payment_response else {}
+                            blockchain_identifier = payment_data.get('blockchainIdentifier') if payment_data else None
+                            identifier_from_purchaser = payment_data.get('identifierFromPurchaser') if payment_data else None
+                            agent_identifier = flow_run.payment_response.get('agent_identifier') if flow_run.payment_response else None
+                            saved_flow_key = flow_run.payment_response.get('flow_key') if flow_run.payment_response else None
                             
                             flow_logger.info(f"Retrieved from stored payment_response:")
                             flow_logger.info(f"  - blockchain_identifier: {blockchain_identifier}")

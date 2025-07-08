@@ -759,8 +759,11 @@ class KodosumyClient:
         
         # Close the HTTP client
         if hasattr(self, '_http_client') and self._http_client is not None:
-            await self._http_client.aclose()
-            self.logger.info("HTTP client closed")
+            try:
+                await self._http_client.aclose()
+                self.logger.info("HTTP client closed")
+            except Exception as e:
+                self.logger.warning("Error closing HTTP client", error=str(e))
         
         # Clear session state
         self._clear_session_state()
