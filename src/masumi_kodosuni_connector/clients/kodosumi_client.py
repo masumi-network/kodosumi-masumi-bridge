@@ -181,14 +181,18 @@ class KodosumyClient:
         needs_auth = (
             self._cookies is None or 
             self._session_expires_at is None or 
-            current_time >= self._session_expires_at - 600  # Re-auth 10 minutes before expiry
+            current_time >= self._session_expires_at - 600 or  # Re-auth 10 minutes before expiry
+            # Re-authenticate if we've had recent failures
+            (self._connection_failures > 0 and 
+             current_time - self._last_successful_request > 60)  # 1 minute since last success
         )
         
         if needs_auth:
             self.logger.info("Session expired or missing, re-authenticating", 
                            has_cookies=self._cookies is not None,
                            expires_at=self._session_expires_at,
-                           current_time=current_time)
+                           current_time=current_time,
+                           recent_failures=self._connection_failures > 0)
             await self.authenticate()
         
         return self._cookies
@@ -248,6 +252,30 @@ class KodosumyClient:
             except Exception as e:
                 self._connection_failures += 1
                 self._failed_requests += 1
+                
+                # Check if this is a connection/network error that might be fixed by re-authentication
+                is_connection_error = isinstance(e, (
+                    httpx.TimeoutException, 
+                    httpx.ConnectError,
+                    httpx.NetworkError,
+                    httpx.RemoteProtocolError,
+                    httpx.HTTPStatusError
+                )) or (hasattr(e, 'response') and hasattr(e.response, 'status_code') and 
+                       e.response.status_code in [401, 403, 500, 502, 503, 504])
+                
+                # On connection errors, immediately try re-authentication on first retry
+                if is_connection_error and attempt == 0:
+                    self.logger.warning("Connection error detected, attempting re-authentication",
+                                      error_type=type(e).__name__,
+                                      error=str(e))
+                    self._clear_session_state()
+                    try:
+                        await self.authenticate()
+                        self.logger.info("Re-authentication successful, retrying request")
+                        continue  # Retry with fresh auth
+                    except Exception as auth_error:
+                        self.logger.error("Re-authentication failed", error=str(auth_error))
+                
                 if self._connection_failures >= self._max_connection_failures:
                     self._is_healthy = False
                     self.logger.error("Connection marked as unhealthy", 
@@ -268,7 +296,7 @@ class KodosumyClient:
                                     url=url,
                                     error=str(e))
                     # If all attempts failed, try one more time with fresh auth
-                    if isinstance(e, (httpx.TimeoutException, httpx.ConnectError)):
+                    if is_connection_error:
                         self.logger.info("Attempting final retry with fresh authentication")
                         self._clear_session_state()
                         await self.authenticate()
@@ -624,10 +652,7 @@ class KodosumyClient:
     async def _perform_health_check(self) -> None:
         """Perform a health check by attempting to get flows."""
         try:
-            # Always try fresh authentication for health check
-            self._clear_session_state()
-            await self.authenticate()
-            
+            # First try with existing session
             response = await self._make_authenticated_request(
                 self._http_client, "get", f"{self.base_url}/flow", timeout=10.0
             )
@@ -639,11 +664,31 @@ class KodosumyClient:
                 self._last_health_check = time.time()
             else:
                 self.logger.warning("Health check failed", status_code=response.status_code)
+                # Try fresh authentication
+                self._clear_session_state()
+                await self.authenticate()
                     
         except Exception as e:
             self.logger.warning("Health check exception", error=str(e))
-            # Mark as unhealthy but don't raise - let recovery continue
-            self._is_healthy = False
+            # Try to recover with fresh authentication
+            try:
+                self._clear_session_state()
+                await self.authenticate()
+                # Try health check again after re-auth
+                response = await self._http_client.get(
+                    f"{self.base_url}/flow", 
+                    cookies=self._cookies,
+                    timeout=10.0
+                )
+                if response.status_code == 200:
+                    self._is_healthy = True
+                    self._connection_failures = 0
+                    self._last_successful_request = time.time()
+                    self._last_health_check = time.time()
+                    self.logger.info("Health check successful after re-authentication")
+            except Exception as recovery_error:
+                self.logger.error("Health check recovery failed", error=str(recovery_error))
+                self._is_healthy = False
 
     async def force_reconnect(self) -> None:
         """Force a fresh connection by clearing state and re-authenticating."""

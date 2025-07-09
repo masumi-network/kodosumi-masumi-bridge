@@ -5,6 +5,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 import os
+import asyncio
 from masumi_kodosuni_connector.api.agent_routes import create_flow_router
 from masumi_kodosuni_connector.api.mip003_routes import create_mip003_router, create_global_mip003_router
 from masumi_kodosuni_connector.database.connection import get_db, init_db
@@ -47,10 +48,23 @@ async def startup_event():
         await agent_config_manager.refresh_cache()
         startup_logger.info("Agent configuration cache initialized")
         
-        # Force fresh authentication on startup
+        # Force fresh authentication on startup with retry
         startup_logger.info("Forcing fresh Kodosumi authentication")
-        await flow_discovery.client.force_reconnect()
-        startup_logger.info("Kodosumi connection established")
+        max_auth_attempts = 3
+        for attempt in range(max_auth_attempts):
+            try:
+                await flow_discovery.client.force_reconnect()
+                startup_logger.info("Kodosumi connection established")
+                break
+            except Exception as auth_error:
+                if attempt < max_auth_attempts - 1:
+                    wait_time = (attempt + 1) * 5  # 5, 10, 15 seconds
+                    startup_logger.warning(f"Authentication attempt {attempt + 1} failed, retrying in {wait_time}s", 
+                                         error=str(auth_error))
+                    await asyncio.sleep(wait_time)
+                else:
+                    startup_logger.error("All authentication attempts failed", error=str(auth_error))
+                    raise
         
         # Get flows to trigger discovery
         flows = await flow_discovery.get_available_flows()
@@ -577,3 +591,78 @@ async def resume_payment_monitoring(
             status_code=500,
             detail=f"Error resuming payment monitoring: {str(e)}"
         )
+
+@app.get("/admin/database-stats")
+async def get_database_stats(_: bool = Depends(get_api_key)):
+    """Get database connection pool statistics."""
+    from masumi_kodosuni_connector.database.connection import engine
+    
+    try:
+        # Get pool statistics
+        pool = engine.pool
+        pool_status = pool.status() if hasattr(pool, 'status') else "Pool status unavailable"
+        
+        # Parse pool status string
+        # Format is typically: "Pool size: X  Connections in pool: Y Current Overflow: Z Current Checked out connections: W"
+        stats = {
+            "raw_status": pool_status,
+            "pool_size": getattr(pool, 'size', 50),
+            "checked_out": getattr(pool, 'checked_out', 0),
+            "overflow": getattr(pool, 'overflow', 0),
+            "total": getattr(pool, 'total', 0),
+        }
+        
+        # Try to parse the status string for more accurate numbers
+        if isinstance(pool_status, str):
+            import re
+            
+            # Extract pool size
+            size_match = re.search(r'Pool size:\s*(\d+)', pool_status)
+            if size_match:
+                stats["pool_size"] = int(size_match.group(1))
+            
+            # Extract connections in pool
+            in_pool_match = re.search(r'Connections in pool:\s*(\d+)', pool_status)
+            if in_pool_match:
+                stats["connections_in_pool"] = int(in_pool_match.group(1))
+            
+            # Extract overflow
+            overflow_match = re.search(r'Current Overflow:\s*(-?\d+)', pool_status)
+            if overflow_match:
+                stats["overflow"] = int(overflow_match.group(1))
+            
+            # Extract checked out connections
+            checked_out_match = re.search(r'Current Checked out connections:\s*(\d+)', pool_status)
+            if checked_out_match:
+                stats["checked_out"] = int(checked_out_match.group(1))
+        
+        # Calculate usage percentage
+        max_connections = stats["pool_size"] + 100  # pool_size + max_overflow
+        current_connections = stats.get("checked_out", 0) + stats.get("connections_in_pool", 0)
+        usage_percentage = (current_connections / max_connections * 100) if max_connections > 0 else 0
+        
+        return {
+            "database_connections": {
+                "pool_size": stats["pool_size"],
+                "max_overflow": 100,
+                "max_connections": max_connections,
+                "checked_out": stats.get("checked_out", 0),
+                "connections_in_pool": stats.get("connections_in_pool", 0),
+                "overflow": stats.get("overflow", 0),
+                "usage_percentage": round(usage_percentage, 2),
+                "status": pool_status,
+                "pool_timeout": 30,
+                "pool_recycle": 3600
+            },
+            "postgresql_config": {
+                "max_connections": 200,
+                "note": "PostgreSQL is configured for 200 max connections"
+            }
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "database_connections": {
+                "status": "Error retrieving pool statistics"
+            }
+        }

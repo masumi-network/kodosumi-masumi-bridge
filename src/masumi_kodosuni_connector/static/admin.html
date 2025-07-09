@@ -91,6 +91,35 @@
             </div>
         </div>
 
+        <!-- Database Connection Stats -->
+        <div class="mb-6 bg-white rounded-lg shadow-sm p-4">
+            <h3 class="text-lg font-semibold text-gray-900 mb-3">Database Connections</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center">
+                    <div class="text-xs text-gray-500 uppercase tracking-wider">Checked Out</div>
+                    <div class="text-2xl font-semibold text-gray-900" id="db-checked-out">-</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-xs text-gray-500 uppercase tracking-wider">In Pool</div>
+                    <div class="text-2xl font-semibold text-gray-900" id="db-in-pool">-</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-xs text-gray-500 uppercase tracking-wider">Usage</div>
+                    <div class="text-2xl font-semibold" id="db-usage">-</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-xs text-gray-500 uppercase tracking-wider">Max Pool</div>
+                    <div class="text-2xl font-semibold text-gray-900" id="db-max-pool">-</div>
+                </div>
+            </div>
+            <div class="mt-3">
+                <div class="bg-gray-200 rounded-full h-2">
+                    <div id="db-usage-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="mt-2 text-xs text-gray-500" id="db-status">-</div>
+        </div>
+
         <!-- Main Content Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Agents Section -->
@@ -197,7 +226,7 @@
         });
         
         async function refreshData() {
-            await Promise.all([loadAgents(), loadRunningJobs()]);
+            await Promise.all([loadAgents(), loadRunningJobs(), loadDatabaseStats()]);
         }
         
         async function loadAgents() {
@@ -248,6 +277,68 @@
             } catch (error) {
                 console.error('Error loading running jobs:', error);
                 showError('running-jobs-table-body', 'Failed to load running jobs');
+            }
+        }
+        
+        async function loadDatabaseStats() {
+            try {
+                // Get API key from URL params if present
+                const urlParams = new URLSearchParams(window.location.search);
+                const apiKey = urlParams.get('api_key');
+                
+                const headers = {};
+                if (apiKey) {
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                }
+                
+                const response = await fetch('/admin/database-stats', {
+                    headers: headers
+                });
+                const data = await response.json();
+                
+                if (data.database_connections) {
+                    const stats = data.database_connections;
+                    
+                    // Update connection numbers
+                    document.getElementById('db-checked-out').textContent = stats.checked_out || 0;
+                    document.getElementById('db-in-pool').textContent = stats.connections_in_pool || 0;
+                    document.getElementById('db-max-pool').textContent = stats.max_connections || 150;
+                    
+                    // Update usage percentage
+                    const usage = stats.usage_percentage || 0;
+                    const usageEl = document.getElementById('db-usage');
+                    usageEl.textContent = `${usage}%`;
+                    
+                    // Color code based on usage
+                    if (usage > 80) {
+                        usageEl.className = 'text-2xl font-semibold text-red-600';
+                    } else if (usage > 60) {
+                        usageEl.className = 'text-2xl font-semibold text-yellow-600';
+                    } else {
+                        usageEl.className = 'text-2xl font-semibold text-green-600';
+                    }
+                    
+                    // Update progress bar
+                    const progressBar = document.getElementById('db-usage-bar');
+                    progressBar.style.width = `${Math.min(usage, 100)}%`;
+                    
+                    // Color code progress bar
+                    if (usage > 80) {
+                        progressBar.className = 'bg-red-600 h-2 rounded-full transition-all duration-300';
+                    } else if (usage > 60) {
+                        progressBar.className = 'bg-yellow-600 h-2 rounded-full transition-all duration-300';
+                    } else {
+                        progressBar.className = 'bg-green-600 h-2 rounded-full transition-all duration-300';
+                    }
+                    
+                    // Update status text
+                    const statusText = `Pool: ${stats.pool_size}, Overflow: ${stats.overflow || 0}, Timeout: ${stats.pool_timeout}s, Recycle: ${stats.pool_recycle}s`;
+                    document.getElementById('db-status').textContent = statusText;
+                }
+                
+            } catch (error) {
+                console.error('Error loading database stats:', error);
+                document.getElementById('db-status').textContent = 'Error loading database statistics';
             }
         }
         
