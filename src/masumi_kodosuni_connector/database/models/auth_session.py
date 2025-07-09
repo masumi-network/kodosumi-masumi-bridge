@@ -9,7 +9,8 @@ class AuthSession(Base):
     __tablename__ = "auth_sessions"
     
     service_name = Column(String(50), primary_key=True, default="kodosumi")
-    cookie_data = Column(Text, nullable=False)  # JSON serialized cookies
+    api_key = Column(Text, nullable=True)  # API key for authentication
+    cookie_data = Column(Text, nullable=True)  # JSON serialized cookies (legacy)
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
