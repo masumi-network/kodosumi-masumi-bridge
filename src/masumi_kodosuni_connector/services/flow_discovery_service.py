@@ -38,16 +38,16 @@ class FlowDiscoveryService:
                 # Another request might have refreshed it while we were waiting
                 if current_time - self._last_refresh > self._cache_duration:
                     try:
-                        await asyncio.wait_for(self._refresh_flows(), timeout=30.0)  # Increased to account for rate limiting
+                        await asyncio.wait_for(self._refresh_flows(), timeout=60.0)  # Increased to account for rate limiting
                         self._last_refresh = current_time
                     except asyncio.TimeoutError:
                         logger.warning("Flow refresh timed out, using existing cache")
-                        # Update last_refresh to prevent immediate retry
-                        self._last_refresh = current_time - (self._cache_duration // 2)
+                        # Update last_refresh to prevent immediate retry for longer
+                        self._last_refresh = current_time - 60  # Only retry after 4 minutes
                     except Exception as e:
                         logger.error("Flow refresh failed, using existing cache", error=str(e))
-                        # Update last_refresh to prevent immediate retry
-                        self._last_refresh = current_time - (self._cache_duration // 2)
+                        # Update last_refresh to prevent immediate retry for longer
+                        self._last_refresh = current_time - 60  # Only retry after 4 minutes
         
         # If cache is still empty (e.g., first startup or persistent failures), use fallback flows
         if not self._flows_cache:
@@ -112,11 +112,7 @@ class FlowDiscoveryService:
         except Exception as e:
             logger.error("Failed to refresh flows", error=str(e))
             # Keep existing cache on error
-            # Try to force reconnect on any error
-            try:
-                await self.client.force_reconnect()
-            except Exception as reconnect_error:
-                logger.error("Failed to reconnect after error", error=str(reconnect_error))
+            # Don't force reconnect on every error - this causes too many re-auths
     
     def get_flow_key_from_path(self, path: str) -> str:
         """Convert a URL path to a flow key."""

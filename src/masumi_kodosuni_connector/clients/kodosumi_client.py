@@ -1,10 +1,15 @@
 import httpx
 import asyncio
 import time
+import json
+from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from masumi_kodosuni_connector.config.settings import settings
 from masumi_kodosuni_connector.config.logging import get_logger
 from masumi_kodosuni_connector.utils.rate_limiter import kodosumi_http_client
+from masumi_kodosuni_connector.database.connection import AsyncSessionLocal
+from masumi_kodosuni_connector.database.models.auth_session import AuthSession
+from sqlalchemy import select
 
 
 class KodosumyFlowStatus:
@@ -131,9 +136,73 @@ class KodosumyClient:
             )
         )
     
+    async def _load_session_from_db(self) -> bool:
+        """Load authentication session from database if valid."""
+        try:
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    select(AuthSession).where(AuthSession.service_name == "kodosumi")
+                )
+                auth_session = result.scalar_one_or_none()
+                
+                if auth_session and auth_session.expires_at > datetime.utcnow():
+                    # Session is still valid
+                    cookie_data = json.loads(auth_session.cookie_data)
+                    self._cookies = httpx.Cookies()
+                    for name, value in cookie_data.items():
+                        self._cookies.set(name, value)
+                    self._session_expires_at = auth_session.expires_at.timestamp()
+                    self.logger.info("Loaded valid session from database", 
+                                   expires_at=auth_session.expires_at.isoformat())
+                    return True
+                elif auth_session:
+                    self.logger.info("Database session expired", 
+                                   expires_at=auth_session.expires_at.isoformat())
+        except Exception as e:
+            self.logger.warning("Failed to load session from database", error=str(e))
+        return False
+    
+    async def _save_session_to_db(self) -> None:
+        """Save authentication session to database."""
+        if not self._cookies or not self._session_expires_at:
+            return
+            
+        try:
+            async with AsyncSessionLocal() as session:
+                # Convert cookies to dict for JSON serialization
+                cookie_dict = {name: value for name, value in self._cookies.items()}
+                
+                # Find existing or create new
+                result = await session.execute(
+                    select(AuthSession).where(AuthSession.service_name == "kodosumi")
+                )
+                auth_session = result.scalar_one_or_none()
+                
+                if not auth_session:
+                    auth_session = AuthSession(service_name="kodosumi")
+                    session.add(auth_session)
+                
+                auth_session.cookie_data = json.dumps(cookie_dict)
+                auth_session.expires_at = datetime.fromtimestamp(self._session_expires_at)
+                auth_session.updated_at = datetime.utcnow()
+                
+                await session.commit()
+                self.logger.info("Saved session to database", 
+                               expires_at=auth_session.expires_at.isoformat())
+        except Exception as e:
+            self.logger.error("Failed to save session to database", error=str(e))
+
     async def authenticate(self) -> None:
         """Authenticate with Kodosumi and store session cookies with expiration tracking."""
         async with self._session_lock:
+            # First try to load from database
+            if await self._load_session_from_db():
+                self._last_successful_request = time.time()
+                self._connection_failures = 0
+                self._is_healthy = True
+                self._start_keepalive_task()
+                return
+            
             self.logger.info("Authenticating with Kodosumi", url=f"{self.base_url}/login")
             
             # Clear any existing session state before authenticating
@@ -149,13 +218,17 @@ class KodosumyClient:
                 
                 if response.status_code == 200:
                     self._cookies = response.cookies
-                    # Set session expiration to 5 hours from now
-                    # Re-authenticate every 5 hours to ensure fresh sessions
-                    self._session_expires_at = time.time() + (5 * 60 * 60)
+                    # Set session expiration to 23 hours from now (Kodosumi sessions last 24h)
+                    # We use 23 hours to have a buffer before actual expiration
+                    self._session_expires_at = time.time() + (23 * 60 * 60)
                     self._last_successful_request = time.time()
                     self._connection_failures = 0
                     self._is_healthy = True
                     self.logger.info("Authentication successful", expires_at=self._session_expires_at)
+                    
+                    # Save session to database
+                    await self._save_session_to_db()
+                    
                     # Start keepalive task after successful authentication
                     self._start_keepalive_task()
                 else:
@@ -177,30 +250,27 @@ class KodosumyClient:
         """Ensure we have valid authentication cookies, re-authenticating if necessary."""
         current_time = time.time()
         
-        # Check if we need to authenticate or re-authenticate
+        # Only re-authenticate if we truly need to
         needs_auth = (
             self._cookies is None or 
             self._session_expires_at is None or 
-            current_time >= self._session_expires_at - 600 or  # Re-auth 10 minutes before expiry
-            # Re-authenticate if we've had recent failures
-            (self._connection_failures > 0 and 
-             current_time - self._last_successful_request > 60)  # 1 minute since last success
+            current_time >= self._session_expires_at  # Only when actually expired
         )
         
         if needs_auth:
             self.logger.info("Session expired or missing, re-authenticating", 
                            has_cookies=self._cookies is not None,
                            expires_at=self._session_expires_at,
-                           current_time=current_time,
-                           recent_failures=self._connection_failures > 0)
+                           current_time=current_time)
             await self.authenticate()
         
         return self._cookies
     
     async def _handle_auth_failure(self, response: httpx.Response) -> bool:
         """Handle authentication failures by checking status codes and re-authenticating."""
-        if response.status_code in [401, 403, 404, 500, 502, 503, 504]:
-            self.logger.warning("Authentication/connectivity failure detected, invalidating session", 
+        # Only 401 and 403 are actual authentication failures
+        if response.status_code in [401, 403]:
+            self.logger.warning("Authentication failure detected, invalidating session", 
                               status_code=response.status_code)
             # Clear session data to force re-authentication
             self._clear_session_state()
@@ -219,9 +289,9 @@ class KodosumyClient:
             try:
                 self._total_requests += 1
                 
-                # Only force fresh authentication if we have no cookies or recent failures
-                if self._cookies is None or (not self._is_healthy and self._connection_failures > 0):
-                    self.logger.info("Forcing fresh authentication due to unhealthy state")
+                # Only force fresh authentication if we have no cookies
+                if self._cookies is None:
+                    self.logger.info("No cookies available, authenticating")
                     await self.authenticate()
                 
                 cookies = await self._ensure_authenticated()
