@@ -13,6 +13,18 @@ class FlowDiscoveryService:
         self._last_refresh = 0
         self._cache_duration = 300  # 5 minutes
         self._refresh_lock = asyncio.Lock()
+        
+        # Initialize with fallback flows to ensure the system works even when Kodosumi is down
+        self._fallback_flows = {
+            "-_127.0.0.1_8001_page_analysis_-_": {
+                "name": "Page Content Analysis",
+                "description": "Answer questions about the content and design of a single website URL",
+                "url": "/-/127.0.0.1/8001/page_analysis/-/",
+                "version": "1.0.0",
+                "author": "system",
+                "tags": ["Content", "Website", "Design"]
+            }
+        }
     
     async def get_available_flows(self) -> Dict[str, Dict[str, Any]]:
         """Get available flows from Kodosumi, with caching."""
@@ -25,8 +37,22 @@ class FlowDiscoveryService:
                 # Double-check the cache after acquiring the lock
                 # Another request might have refreshed it while we were waiting
                 if current_time - self._last_refresh > self._cache_duration:
-                    await self._refresh_flows()
-                    self._last_refresh = current_time
+                    try:
+                        await asyncio.wait_for(self._refresh_flows(), timeout=30.0)  # Increased to account for rate limiting
+                        self._last_refresh = current_time
+                    except asyncio.TimeoutError:
+                        logger.warning("Flow refresh timed out, using existing cache")
+                        # Update last_refresh to prevent immediate retry
+                        self._last_refresh = current_time - (self._cache_duration // 2)
+                    except Exception as e:
+                        logger.error("Flow refresh failed, using existing cache", error=str(e))
+                        # Update last_refresh to prevent immediate retry
+                        self._last_refresh = current_time - (self._cache_duration // 2)
+        
+        # If cache is still empty (e.g., first startup or persistent failures), use fallback flows
+        if not self._flows_cache:
+            logger.warning("Using fallback flows due to empty cache")
+            return self._fallback_flows
         
         return self._flows_cache
     
@@ -43,14 +69,19 @@ class FlowDiscoveryService:
     async def _refresh_flows(self) -> None:
         """Refresh the flows cache from Kodosumi."""
         try:
-            # Add timeout to prevent hanging
+            # Add timeout to prevent hanging (increased to account for rate limiting)
             flows = await asyncio.wait_for(
                 self.client.get_available_flows(), 
-                timeout=30.0
+                timeout=45.0  # Increased timeout to account for rate limiting delays
             )
             self._flows_cache = {}
             
             for flow in flows:
+                # Ensure flow is a dictionary
+                if not isinstance(flow, dict):
+                    logger.warning("Skipping non-dict flow", flow_type=type(flow).__name__, flow_data=str(flow))
+                    continue
+                
                 # Create a flow key from the URL path
                 flow_path = flow.get("url", "")
                 if flow_path.startswith("/"):
@@ -60,6 +91,7 @@ class FlowDiscoveryService:
                 
                 # Skip empty keys
                 if not flow_key:
+                    logger.warning("Skipping flow with empty key", flow_data=str(flow)[:200])
                     continue
                 
                 self._flows_cache[flow_key] = {
@@ -74,14 +106,12 @@ class FlowDiscoveryService:
             logger.info("Refreshed flows cache", flow_count=len(self._flows_cache))
             
         except asyncio.TimeoutError:
-            logger.error("Flow refresh timed out after 30 seconds")
-            # Try to force reconnect on timeout
-            try:
-                await self.client.force_reconnect()
-            except Exception as reconnect_error:
-                logger.error("Failed to reconnect after timeout", error=str(reconnect_error))
+            logger.warning("Flow refresh timed out after 45 seconds, keeping existing cache")
+            # Don't try to reconnect immediately to avoid cascading failures
+            # Just keep the existing cache
         except Exception as e:
             logger.error("Failed to refresh flows", error=str(e))
+            # Keep existing cache on error
             # Try to force reconnect on any error
             try:
                 await self.client.force_reconnect()

@@ -87,8 +87,12 @@ def create_mip003_router(flow_key: str, flow_info: dict) -> APIRouter:
     async def check_availability():
         """Check service availability following MIP-003 specification."""
         try:
-            # Check if we can reach the flow
-            flows = await flow_discovery.get_available_flows()
+            # Check if we can reach the flow with timeout protection
+            import asyncio
+            flows = await asyncio.wait_for(
+                flow_discovery.get_available_flows(), 
+                timeout=20.0  # Increased timeout to account for rate limiting
+            )
             if flow_key in flows:
                 return AvailabilityResponse(
                     status="available",
@@ -101,6 +105,12 @@ def create_mip003_router(flow_key: str, flow_info: dict) -> APIRouter:
                     type="masumi-agent",
                     message=f"{flow_info['name']} is not available"
                 )
+        except asyncio.TimeoutError:
+            return AvailabilityResponse(
+                status="unavailable",
+                type="masumi-agent",
+                message=f"Service check timed out - {flow_info['name']} availability unknown"
+            )
         except Exception as e:
             return AvailabilityResponse(
                 status="unavailable",
@@ -138,7 +148,11 @@ def create_global_mip003_router() -> APIRouter:
     async def check_global_availability():
         """Check global service availability."""
         try:
-            flows = await flow_discovery.get_available_flows()
+            import asyncio
+            flows = await asyncio.wait_for(
+                flow_discovery.get_available_flows(), 
+                timeout=20.0  # Increased timeout to account for rate limiting
+            )
             if flows:
                 return AvailabilityResponse(
                     status="available",
@@ -151,6 +165,12 @@ def create_global_mip003_router() -> APIRouter:
                     type="masumi-agent",
                     message="No flows available"
                 )
+        except asyncio.TimeoutError:
+            return AvailabilityResponse(
+                status="unavailable",
+                type="masumi-agent",
+                message="Service check timed out - global availability unknown"
+            )
         except Exception as e:
             return AvailabilityResponse(
                 status="unavailable",

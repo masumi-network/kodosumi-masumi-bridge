@@ -70,6 +70,10 @@ async def startup_event():
         flows = await flow_discovery.get_available_flows()
         startup_logger.info(f"Discovered {len(flows)} flows from Kodosumi")
         
+        # Sync agent config with discovered flows (essential for route registration)
+        await agent_config_manager.sync_with_flows(flows)
+        startup_logger.info("Synced agent config with discovered flows")
+        
         # Load and expose API routes
         global _flow_routers_added
         _flow_routers_added = False

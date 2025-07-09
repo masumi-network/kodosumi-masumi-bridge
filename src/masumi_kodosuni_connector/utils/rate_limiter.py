@@ -29,7 +29,11 @@ class RateLimiter:
                 oldest_call = min(self.calls)
                 wait_time = self.time_window - (now - oldest_call)
                 if wait_time > 0:
-                    logger.info("Rate limit reached, waiting", wait_seconds=wait_time)
+                    logger.warning("Rate limit reached, waiting", 
+                                 wait_seconds=round(wait_time, 2),
+                                 current_calls=len(self.calls),
+                                 max_calls=self.max_calls,
+                                 time_window=self.time_window)
                     await asyncio.sleep(wait_time)
                     return await self.acquire()  # Recursive call after waiting
             
@@ -116,12 +120,21 @@ class RateLimitedHTTPClient:
             
             # Check for rate limiting response codes
             if response.status_code == 429:  # Too Many Requests
-                retry_after = response.headers.get('retry-after')
-                if retry_after:
-                    wait_time = float(retry_after)
-                    self.logger.warning("Server rate limit hit, waiting", wait_seconds=wait_time)
-                    await asyncio.sleep(wait_time)
+                retry_after = response.headers.get('retry-after', '5')  # Default to 5 seconds
+                wait_time = float(retry_after)
+                self.logger.warning("Server rate limit hit, waiting", 
+                                  wait_seconds=wait_time,
+                                  status_code=response.status_code,
+                                  url=url)
+                await asyncio.sleep(wait_time)
                 raise Exception(f"Rate limited by server: {response.status_code}")
+            
+            # Also check for 503 Service Unavailable which might indicate rate limiting
+            if response.status_code == 503:
+                self.logger.warning("Service unavailable, possibly rate limited", 
+                                  status_code=response.status_code,
+                                  url=url)
+                raise Exception(f"Service unavailable (possible rate limit): {response.status_code}")
             
             # Raise for other HTTP errors (will be caught by backoff)
             if response.status_code >= 500:
@@ -138,12 +151,12 @@ class RateLimitedHTTPClient:
 
 
 # Global instances for use across the application
-kodosumi_rate_limiter = RateLimiter(max_calls=20, time_window=60.0)  # 20 calls per minute
+kodosumi_rate_limiter = RateLimiter(max_calls=12, time_window=60.0)  # 12 calls per minute (more conservative)
 masumi_rate_limiter = RateLimiter(max_calls=30, time_window=60.0)    # 30 calls per minute
 
 kodosumi_http_client = RateLimitedHTTPClient(
     rate_limiter=kodosumi_rate_limiter,
-    backoff=ExponentialBackoff(max_retries=3, base_delay=1.0, max_delay=30.0)
+    backoff=ExponentialBackoff(max_retries=3, base_delay=2.0, max_delay=60.0)  # Longer delays for rate limiting
 )
 
 masumi_http_client = RateLimitedHTTPClient(

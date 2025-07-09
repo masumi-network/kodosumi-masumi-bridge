@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     
     polling_interval_seconds: int = Field(default=30, env="POLLING_INTERVAL_SECONDS")
     
+    # Job Processing Configuration
+    max_concurrent_status_checks: int = Field(default=10, env="MAX_CONCURRENT_STATUS_CHECKS")
+    batch_delay_seconds: int = Field(default=5, env="BATCH_DELAY_SECONDS")
+    
     # API Security
     api_key: Optional[str] = Field(default=None, env="API_KEY")
     

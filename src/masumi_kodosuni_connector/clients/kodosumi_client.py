@@ -219,8 +219,8 @@ class KodosumyClient:
             try:
                 self._total_requests += 1
                 
-                # Always try to authenticate fresh if we're unhealthy
-                if not self._is_healthy or self._cookies is None:
+                # Only force fresh authentication if we have no cookies or recent failures
+                if self._cookies is None or (not self._is_healthy and self._connection_failures > 0):
                     self.logger.info("Forcing fresh authentication due to unhealthy state")
                     await self.authenticate()
                 
@@ -652,9 +652,11 @@ class KodosumyClient:
     async def _perform_health_check(self) -> None:
         """Perform a health check by attempting to get flows."""
         try:
-            # First try with existing session
-            response = await self._make_authenticated_request(
-                self._http_client, "get", f"{self.base_url}/flow", timeout=10.0
+            # First try with existing session (avoid circular dependency by not using _make_authenticated_request)
+            cookies = await self._ensure_authenticated()
+            response = await kodosumi_http_client.request(
+                self._http_client, "get", f"{self.base_url}/flow", 
+                cookies=cookies, timeout=10.0
             )
             if response.status_code == 200:
                 self.logger.info("Health check successful")
@@ -675,10 +677,9 @@ class KodosumyClient:
                 self._clear_session_state()
                 await self.authenticate()
                 # Try health check again after re-auth
-                response = await self._http_client.get(
-                    f"{self.base_url}/flow", 
-                    cookies=self._cookies,
-                    timeout=10.0
+                response = await kodosumi_http_client.request(
+                    self._http_client, "get", f"{self.base_url}/flow", 
+                    cookies=self._cookies, timeout=10.0
                 )
                 if response.status_code == 200:
                     self._is_healthy = True
